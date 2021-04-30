@@ -11,9 +11,9 @@ template = 'uvtest'
 
 
 # controls
-gen_uv = True
 gen_data = False
 fit_data = False
+overwrite_template = True
 
 
 # Model parameters

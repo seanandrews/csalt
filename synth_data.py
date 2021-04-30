@@ -1,5 +1,5 @@
 """
-decription tbd
+Generate a synthetic ALMA dataset.
 
 """
 
@@ -10,46 +10,72 @@ import mconfig as in_
 from cube_parser import cube_parser
 
 
-# Generate a synthetic observation template
-gen_template = False
-if in_.gen_uv:
-    # First, check if the template exists; decide whether to use it
-    if np.logical_and(os.path.exists('obs_templates/'+in_.template+'.uvfits'),
-                      os.path.exists('obs_templates/'+in_.template+'.params')):
-       io = np.loadtxt('obs_templates/'+in_.template+'.params', dtype=str)
-       io_in = [in_.RA, in_.DEC, in_.date, in_.HA, in_.config, in_.ttotal,
-                in_.integ]
-       if io == io_in:
-           print('This template exists.  Would you like to use the one on ' + 
-                 'file already? (y | n)')
-           use_existing = input()
-           if np.logical_or((input() == 'y'), (input() == 'Y')):
-               gen_template = False
-           else:
-               os.system('rm -rf obs_templates/'+in_.template+'*')
-               os.system('rm -rf obs_templates/sims/'+in_.template+'*')
-               gen_template = True
+# file parsing
+tpre = 'obs_templates/'+in_.template
+
+
+### Decide whether to create or use an existing observational template
+if np.logical_and(os.path.exists(tpre+'.uvfits'), 
+                  os.path.exists(tpre+'.params')):
+
+    # load the parameters for the existing template
+    tp = np.loadtxt(tpre+'.params', dtype=str).tolist()
+
+    # if the parameters are the same, use the existing one; otherwise, save
+    # the old one under a previous name and proceed
+    ip = [in_.RA, in_.DEC, in_.date, in_.HA, in_.config, in_.ttotal, in_.integ]
+    if tp == ip:
+        print('This template already exists...using the files from %s' % \
+              (time.ctime(os.path.getctime(tpre+'.uvfits'))))
+        gen_template = False
     else:
         gen_template = True
-    
-if gen_template: 
-    # Set the channels in frequency and LSRK velocity domains
-    nu_span = in_.restfreq * (in_.vsys - in_.vspan) / c_.c
-    nu_sys  = in_.restfreq * (1 - in_.vsys / c_.c)
-    nch = np.int(2 * np.abs(nu_span) / (in_.dfreq0 / in_.sosampl) + 1)
-    freq = nu_sys - nu_span - (in_.dfreq0 / in_.sosampl) * np.arange(nch)
-    vel = c_.c * (1. - freq / in_.restfreq)
+        if overwrite_template:
+            print('Removing old template with same name, but different params')
+            os.system('rm '+tpre+'.uvfits '+tpre+'.params')
+            os.system('rm obs_templates/sims/'+in_.template+'*')
+        else:
+            print('Renaming old template with same name, but different params')
+            old_t = time.ctime(os.path.getctime(tpre+'.uvfits'))
+            os.system('mv '+tpre+'.uvfits '+tpre+'_'+old_t+'.uvfits') 
+            os.system('mv '+tpre+'.params '+tpre+'_'+old_t+'.params')
+            os.system('mv obs_templates/sims/'+in_.template+' '+ \
+                      'obs_templates/sims/'+in_.template+'_'+old_t)
+            
+else:
+    gen_template = True
 
-    # Parse the target coordinates into degrees
+
+### Generate the mock observations template (if necessary)
+if gen_template: 
+
+    # Create a template parameters file for records
+    ip = [in_.RA, in_.DEC, in_.date, in_.HA, in_.config, in_.ttotal, in_.integ]
+    f = open(tpre+'.params', 'w')
+    [f.write(ip[i]+'\n') for i in range(6)]
+    f.write(ip[-1])
+    f.close()
+
+    # Set the native LSRK channels 
+    nu_span = in_.restfreq * (in_.vsys - in_.vspan) / c_.c
+    nu_sys = in_.restfreq * (1 - in_.vsys / c_.c)
+    nch = np.int(2 * np.abs(nu_span) / in_.dfreq0 + 1)
+    freq = nu_sys - nu_span - in_.dfreq0 * np.arange(nch)
+    vel = c_.c * (1 - freq / in_.restfreq)
+
+    # Target coordinates into decimal degrees
     RA_pieces = [np.float(in_.RA.split(':')[i]) for i in np.arange(3)]
     RAdeg = 15 * np.sum(np.array(RA_pieces) / [1., 60., 3600.])
     DEC_pieces = [np.float(in_.DEC.split(':')[i]) for i in np.arange(3)]
     DECdeg = np.sum(np.array(DEC_pieces) / [1., 60., 3600.])
 
-    # Generate a model cube; save it as a FITS file
+    # Generate a dummy model .FITS cube
     cube_parser(in_.pars, FOV=8, Npix=256, dist=150, r_max=300, 
                 restfreq=in_.restfreq, RA=RAdeg, DEC=DECdeg, Vsys=in_.vsys,
-                vel=vel, outfile='obs_templates/'+in_.template+'.fits')
+                vel=vel, outfile=tpre+'.fits')
 
-    # Generate the (u,v) tracks
+    # Generate the (u,v) tracks and spectra on starting integration LSRK frame
     os.system('casa --nologger --nologfile -c CASA_scripts/mock_obs.py')
+
+
+

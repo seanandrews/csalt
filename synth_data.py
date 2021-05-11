@@ -27,7 +27,7 @@ if np.logical_and(os.path.exists(tpre+'.uvfits'),
     if tp == ip:
         print('This template already exists...using the files from %s' % \
               (time.ctime(os.path.getctime(tpre+'.uvfits'))))
-        gen_template = False
+        gen_template = True	#False
     else:
         gen_template = True
         if overwrite_template:
@@ -57,11 +57,27 @@ if gen_template:
     f.close()
 
     # Set the native LSRK channels 
-    nu_span = in_.restfreq * (in_.vsys - in_.vspan) / c_.c
+    dv0 = c_.c * in_.dfreq0 / in_.restfreq
+    nch = 2 * np.int(in_.vspan / dv0) + 1
+    vel = in_.vsys + dv0 * (np.arange(nch) - np.int(nch/2) + 1)
+    print(vel) 
+    sys.exit()
+
+
+    #nu_span = in_.restfreq * (in_.vsys - in_.vspan) / c_.c
+    nu_span = in_.restfreq * (0 - in_.vspan) / c_.c
+    print(nu_span)
+    print(' ')
     nu_sys = in_.restfreq * (1 - in_.vsys / c_.c)
     nch = np.int(2 * np.abs(nu_span) / in_.dfreq0 + 1)
+    print(nch)
+    #nch = np.int(2 * np.abs(nu_span) / in_.dfreq0) + 1
     freq = nu_sys - nu_span - in_.dfreq0 * np.arange(nch)
     vel = c_.c * (1 - freq / in_.restfreq)
+    print(np.mean(np.diff(vel * 1e-3)))
+    print(' ')
+    print(c_.c * (in_.dfreq0 / in_.restfreq))
+    sys.exit()
 
     # Target coordinates into decimal degrees
     RA_pieces = [np.float(in_.RA.split(':')[i]) for i in np.arange(3)]

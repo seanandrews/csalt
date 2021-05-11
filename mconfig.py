@@ -15,6 +15,9 @@ gen_data = False
 fit_data = False
 overwrite_template = True
 
+# auxiliary file locations
+simobs_dir = '/pool/asha0/casa-release-5.7.2-4.el7/data/alma/simmos/'
+
 
 # Model parameters
 # ----------------

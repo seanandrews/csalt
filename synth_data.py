@@ -23,14 +23,15 @@ if np.logical_and(os.path.exists(tpre+'.uvfits'),
 
     # if the parameters are the same, use the existing one; otherwise, save
     # the old one under a previous name and proceed
-    ip = [in_.RA, in_.DEC, in_.date, in_.HA, in_.config, in_.ttotal, in_.integ]
+    ip = [in_.RA, in_.DEC, in_.date, in_.HA, in_.config, in_.ttotal, 
+          in_.integ, in_.spec_oversample]
     if tp == ip:
         print('This template already exists...using the files from %s' % \
               (time.ctime(os.path.getctime(tpre+'.uvfits'))))
         gen_template = True	#False
     else:
         gen_template = True
-        if overwrite_template:
+        if in_.overwrite_template:
             print('Removing old template with same name, but different params')
             os.system('rm '+tpre+'.uvfits '+tpre+'.params')
             os.system('rm obs_templates/sims/'+in_.template+'*')
@@ -50,36 +51,19 @@ else:
 if gen_template: 
 
     # Create a template parameters file for records
-    ip = [in_.RA, in_.DEC, in_.date, in_.HA, in_.config, in_.ttotal, in_.integ]
+    ip = [in_.RA, in_.DEC, in_.date, in_.HA, in_.config, in_.ttotal, 
+          in_.integ, in_.spec_oversample]
     f = open(tpre+'.params', 'w')
-    [f.write(ip[i]+'\n') for i in range(6)]
-    f.write(ip[-1])
+    [f.write(ip[i]+'\n') for i in range(7)]
+    f.write(str(ip[-1]))
     f.close()
 
-    # Set the native LSRK channels 
-    dv0 = c_.c * in_.dfreq0 / in_.restfreq
+    # Set the over-sampled (LSRK) channels for calculating the template
+    dv0 = (c_.c * in_.dfreq0 / in_.restfreq) / in_.spec_oversample
     nch = 2 * np.int(in_.vspan / dv0) + 1
     vel = in_.vsys + dv0 * (np.arange(nch) - np.int(nch/2) + 1)
-    print(vel) 
-    sys.exit()
 
-
-    #nu_span = in_.restfreq * (in_.vsys - in_.vspan) / c_.c
-    nu_span = in_.restfreq * (0 - in_.vspan) / c_.c
-    print(nu_span)
-    print(' ')
-    nu_sys = in_.restfreq * (1 - in_.vsys / c_.c)
-    nch = np.int(2 * np.abs(nu_span) / in_.dfreq0 + 1)
-    print(nch)
-    #nch = np.int(2 * np.abs(nu_span) / in_.dfreq0) + 1
-    freq = nu_sys - nu_span - in_.dfreq0 * np.arange(nch)
-    vel = c_.c * (1 - freq / in_.restfreq)
-    print(np.mean(np.diff(vel * 1e-3)))
-    print(' ')
-    print(c_.c * (in_.dfreq0 / in_.restfreq))
-    sys.exit()
-
-    # Target coordinates into decimal degrees
+    # Convert target coordinates into decimal degrees
     RA_pieces = [np.float(in_.RA.split(':')[i]) for i in np.arange(3)]
     RAdeg = 15 * np.sum(np.array(RA_pieces) / [1., 60., 3600.])
     DEC_pieces = [np.float(in_.DEC.split(':')[i]) for i in np.arange(3)]
@@ -92,6 +76,3 @@ if gen_template:
 
     # Generate the (u,v) tracks and spectra on starting integration LSRK frame
     os.system('casa --nologger --nologfile -c CASA_scripts/mock_obs.py')
-
-
-

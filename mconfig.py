@@ -46,8 +46,8 @@ pars[12] = np.inf	# outer disk optical depth gradient
 dfreq0   = 61.035e3    # in Hz
 restfreq = 230.538e9          # in Hz
 vsys     = 4.0e3             # in m/s
-vspan    = 10e3             # in m/s
-sosampl  = 3     
+vspan    = 1e3             # in m/s
+spec_oversample = 3     
 
 # spatial settings
 RA   = '04:30:00.00'

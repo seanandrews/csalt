@@ -19,8 +19,7 @@ tb.open(sim_MS)
 times = tb.getcol("TIME")
 tb.close()
 
-# open the MS table and extract the frequencies (CASA/simobserve defaults to
-# LSRK frequencies)
+# open the MS table and extract the frequencies 
 tb.open(sim_MS+'/SPECTRAL_WINDOW')
 nchan = tb.getcol('NUM_CHAN').tolist()[0]
 freqlist = np.squeeze(tb.getcol("CHAN_FREQ"))
@@ -34,7 +33,8 @@ datetime0 = au.mjdsecToTimerangeComponent(tstamps[0])
 
 # set the fixed TOPO frequencies ("Doppler setting")
 vLSRK_0 = 1e-3 * c * (1 - freqlist[0] / restfreq)
-print(1e-3 * c * (1 - freqlist / restfreq))
+#print(1e-3 * c * (1 - freqlist / restfreq))
+print(vLSRK_0)
 freq_TOPO = au.restToTopo(restfreq, vLSRK_0, datetime0, RA, DEC) - \
             dfreq0 * np.arange(nchan)
 

@@ -1,2 +1,2 @@
-# dsalt
-Disk Spectral Analysis with Line Tomography
+# csalt
+Circumstellar Spectral Analysis with Line Tomography

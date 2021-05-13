@@ -37,6 +37,11 @@ pars[10] = 100.		# optical depth at r_0
 pars[11] = 0		# optical depth gradient
 pars[12] = np.inf	# outer disk optical depth gradient
 
+FOV = 8.
+Npix = 256
+dist = 150.
+rmax = 300.
+
  
 
 
@@ -45,8 +50,9 @@ pars[12] = np.inf	# outer disk optical depth gradient
 # spectral settings
 dfreq0   = 61.035e3    # in Hz
 restfreq = 230.538e9          # in Hz
+vtune    = 4.0e3
 vsys     = 4.0e3             # in m/s
-vspan    = 1e3             # in m/s
+vspan    = 0.5e3             # in m/s
 spec_oversample = 3     
 
 # spatial settings
@@ -57,7 +63,7 @@ date = '2021/12/01'
 
 # observation settings
 config = '5'
-ttotal = '20min'
+ttotal = '5min'
 integ  = '30s'
 
 

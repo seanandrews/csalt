@@ -45,7 +45,7 @@ rmax = 300.
 chanstart_out = 3.65e3
 chanwidth_out = 80.
 nchan_out = 5
-
+RMS = 5.0
  
 
 

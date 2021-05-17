@@ -99,6 +99,11 @@ computed properly in a set of TOPO channels.  After convolution with the SRF,
 it is down-sampled and interpolated to the set of desired LSRK channels.
 
 The outputs are saved in both a MS and easier-to-access (.NPZ) format.
+
+The noise injection / corruption here make the very simple assumption that each 
+visibility shares the same Gaussian parent distribution.  The corrupted signal 
+is propagated through the spectral signal processing machinery, so that mimics 
+the realistic covariances.  But this is perhaps too simple...
 """
 ### Setups for model visibilities
 # Load template
@@ -203,9 +208,15 @@ for i in range(nstamps):
                                  axis=1, fill_value='extrapolate')
     noisy_vis_out[:,:,ixl:ixh,:] = nvis_interp_stamp(freq_out)
 
+# Assign the weights
+weights_out = np.sqrt(1 / sigma_out) * np.ones((npol, in_.nchan_out, nvis))
+
 
 ### Package data (both in .npz and .ms formats)
+os.system('rm -rf data/'+in_.basename+'_tmp-'+in_.template+'.npz')
+np.savez('data/'+in_.basename+'_tmp-'+in_.template+'.npz', 
+         u=uu, v=vv, freq = freq_out, vel=vel_out, weights=weights_out,
+         vis=clean_vis_out[:,:,:,0] + 1j*clean_vis_out[:,:,:,1],
+         vis_noisy= noisy_vis_out[:,:,:,0] + 1j*noisy_vis_out[:,:,:,1])
 
-#os.system('casa --nologger --nologfile -c CASA_scripts/regrid_to_LSRK.py')
-
-
+os.system('casa --nologger --nologfile -c CASA_scripts/pack_data.py')

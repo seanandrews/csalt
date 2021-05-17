@@ -1,6 +1,5 @@
 """
 Generate a synthetic ALMA dataset.
-
 """
 
 import os, sys, time
@@ -14,14 +13,22 @@ from cube_parser import cube_parser
 import matplotlib.pyplot as plt
 
 
-# file parsing
-tpre = 'obs_templates/'+in_.template
 
+"""
+First decide if a new 'template' MS needs to be created using CASA/simobserve.
+    > If the same template already exists, don't make a new one.  
+    > If a template of the same name but different parameters exists, either 
+      copy the old one into a new name (with the date/time string appended), or 
+      just delete it (if overwrite_template = True) and make a new template.
 
+A template is created with a 'dummy' cube as the model.  The goal is to get a 
+proper MS structure, with the right (u, v, oversampled channel) dimensions and 
+formatting.  An actual model will use these with an appropriate cube.
+"""
 ### Decide whether to create or use an existing observational template
+tpre = 'obs_templates/'+in_.template
 if np.logical_and(os.path.exists(tpre+'.ms'), 
                   os.path.exists(tpre+'.params')):
-
     # load the parameters for the existing template
     tp = np.loadtxt(tpre+'.params', dtype=str).tolist()
 
@@ -46,11 +53,11 @@ if np.logical_and(os.path.exists(tpre+'.ms'),
             os.system('mv '+tpre+'.params '+tpre+'_'+old_t+'.params')
             os.system('mv obs_templates/sims/'+in_.template+' '+ \
                       'obs_templates/sims/'+in_.template+'_'+old_t)
-            
 else:
     gen_template = True
 
-# Parse model coordinates
+
+# Parse model coordinates into decimal degrees
 RA_pieces = [np.float(in_.RA.split(':')[i]) for i in np.arange(3)]
 RAdeg = 15 * np.sum(np.array(RA_pieces) / [1., 60., 3600.])
 DEC_pieces = [np.float(in_.DEC.split(':')[i]) for i in np.arange(3)]
@@ -59,7 +66,6 @@ DECdeg = np.sum(np.array(DEC_pieces) / [1., 60., 3600.])
 
 ### Generate the mock observations template (if necessary)
 if gen_template: 
-
     # Create a template parameters file for records
     ip = [in_.RA, in_.DEC, in_.date, in_.HA, in_.config, in_.ttotal, 
           in_.integ, in_.spec_oversample]
@@ -81,8 +87,20 @@ if gen_template:
     # Generate the (u,v) tracks and spectra on starting integration LSRK frame
     os.system('casa --nologger --nologfile -c CASA_scripts/mock_obs.py')
 
+    # Get rid of the .FITS cube (equivalent is stored in CASA .image format in
+    # the corresponding obs_templates/sims/ directory ('*.skymodel')
+    os.system('rm -rf '+tpre+'.fits')
 
-### Generate synthetic visibility data
+
+
+"""
+Generate a synthetic dataset.  Initially this is spectrally over-sampled, and 
+computed properly in a set of TOPO channels.  After convolution with the SRF, 
+it is down-sampled and interpolated to the set of desired LSRK channels.
+
+The outputs are saved in both a MS and easier-to-access (.NPZ) format.
+"""
+### Setups for model visibilities
 # Load template
 tmp = np.load('obs_templates/'+in_.template+'.npz')
 
@@ -93,15 +111,35 @@ if len(tmp_data.shape) == 3:
 else:
     npol, nchan, nvis = 1, tmp_data.shape[0], tmp_data.shape[1]
 
-# Spatial frequencies (lambda units)
+# Spatial frequencies (lambda units) [nvis-length vectors]
+# Note: this is an approximation that neglects the spectral dependence of the 
+# baseline lengths, owing to the small bandwidth of reasonable applications.
 uu = tmp_uvw[0,:] * np.mean(tmp['freq_LSRK']) / c_.c
 vv = tmp_uvw[1,:] * np.mean(tmp['freq_LSRK']) / c_.c
 
-# Get LSRK velocities
+# LSRK velocities [ntimestamp x nchan array)
 v_LSRK = c_.c * (1 - tmp['freq_LSRK'] / in_.restfreq)
 
-# Compute visibilities at each timestamp
+
+### Configure noise
+# Scale the desired output naturally-weighted RMS per channel (in_.RMS) to the
+# corresponding standard deviation per visibility (per pol) for the same 
+# channel spacing (sigma_out); note that in_.RMS is specified in mJy
+sigma_out = 1e-3 * in_.RMS * np.sqrt(npol * nvis)
+
+# Scale that noise per visibility (per pol) to account for the spectral 
+# over-sampling and the convolution with the spectral response function
+sigma_noise = sigma_out * np.sqrt(np.pi * in_.spec_oversample)
+
+# Random Gaussian noise draws [npol x nchan x nvis x real/imag array]
+# Note: we separate the real/imaginary components for faster convolution 
+# calculations; these will be put together into complex arrays later
+noise = np.squeeze(np.random.normal(0, sigma_noise, (npol, nchan, nvis, 2)))
+
+
+### Compute noisy and uncorrupted ("clean") visibilities at each timestamp
 clean_vis = np.squeeze(np.empty((npol, nchan, nvis, 2)))
+noisy_vis = np.squeeze(np.empty((npol, nchan, nvis, 2)))
 nstamps = v_LSRK.shape[0]
 nperstamp = np.int(nvis / nstamps)
 for i in range(nstamps):
@@ -109,12 +147,12 @@ for i in range(nstamps):
     print('timestamp '+str(i+1)+' / '+str(nstamps))
 
     # create a model cube
-    foo = cube_parser(in_.pars, FOV=in_.FOV, Npix=in_.Npix, dist=in_.dist, 
-                      r_max=in_.rmax, Vsys=in_.vsys, vel=v_LSRK[i,:], 
-                      restfreq=in_.restfreq)#, RA=RAdeg, DEC=DECdeg)
+    cube = cube_parser(in_.pars, FOV=in_.FOV, Npix=in_.Npix, dist=in_.dist, 
+                       r_max=in_.rmax, Vsys=in_.vsys, vel=v_LSRK[i,:], 
+                       restfreq=in_.restfreq)
 
     # sample it's Fourier transform on the template (u,v) spacings
-    mvis = vis_sample(imagefile=foo, uu=uu, vv=vv, mu_RA=0, mu_DEC=0, 
+    mvis = vis_sample(imagefile=cube, uu=uu, vv=vv, mu_RA=0, mu_DEC=0, 
                       mod_interp=False).T
 
     # populate the results in the output array *for this timestamp only*
@@ -124,9 +162,15 @@ for i in range(nstamps):
         clean_vis[1,:,ixl:ixh,0] = mvis.real[:,ixl:ixh]
         clean_vis[0,:,ixl:ixh,1] = mvis.imag[:,ixl:ixh]
         clean_vis[1,:,ixl:ixh,1] = mvis.imag[:,ixl:ixh]
+        noisy_vis[0,:,ixl:ixh,0] = mvis.real[:,ixl:ixh] + noise[0,:,ixl:ixh,0]
+        noisy_vis[1,:,ixl:ixh,0] = mvis.real[:,ixl:ixh] + noise[1,:,ixl:ixh,0]
+        noisy_vis[0,:,ixl:ixh,1] = mvis.imag[:,ixl:ixh] + noise[0,:,ixl:ixh,1]
+        noisy_vis[1,:,ixl:ixh,1] = mvis.imag[:,ixl:ixh] + noise[1,:,ixl:ixh,1]
     else:
         clean_vis[:,ixl:ixh,0] = mvis.real[:,ixl:ixh]
         clean_vis[:,ixl:ixh,1] = mvis.imag[:,ixl:ixh]
+        noisy_vis[:,ixl:ixh,0] = mvis.real[:,ixl:ixh] + noise[:,ixl:ixh,0]
+        noisy_vis[:,ixl:ixh,1] = mvis.imag[:,ixl:ixh] + noise[:,ixl:ixh,1]
 
 
 ### Spectral signal processing
@@ -135,20 +179,29 @@ chix = np.arange(nchan) / in_.spec_oversample
 xch = chix - np.mean(chix)
 SRF = 0.5 * np.sinc(xch) + 0.25 * np.sinc(xch - 1) + 0.25 * np.sinc(xch + 1)
 clean_vis_SRF = convolve1d(clean_vis, SRF/np.sum(SRF), axis=1, mode='nearest')
+noisy_vis_SRF = convolve1d(noisy_vis, SRF/np.sum(SRF), axis=1, mode='nearest')
 
 # decimate by the over-sampling factor
 clean_vis_0 = clean_vis_SRF[:,::in_.spec_oversample,:,:]
+noisy_vis_0 = noisy_vis_SRF[:,::in_.spec_oversample,:,:]
 freq_LSRK_0 = tmp['freq_LSRK'][:,::in_.spec_oversample]
 
-# Interpolate onto desired output channels (as with CASA/mstransform)
+# Interpolate onto desired output channels (this is what happens when you use 
+# CASA/mstransform to go from TOPO --> the specified LSRK channels when the 
+# output LSRK channel spacing is <2x the TOPO channel spacing; that is what we 
+# want to do with real data, so we have a good model for the covariance matrix)
 vel_out = in_.chanstart_out + in_.chanwidth_out * np.arange(in_.nchan_out)
 freq_out = in_.restfreq * (1 - vel_out / c_.c)
 clean_vis_out = np.empty((npol, in_.nchan_out, nvis, 2))
+noisy_vis_out = np.empty((npol, in_.nchan_out, nvis, 2))
 for i in range(nstamps):
     ixl, ixh = i * nperstamp, (i + 1) * nperstamp
-    fvis_interp_stamp = interp1d(freq_LSRK_0[i,:], clean_vis_0[:,:,ixl:ixh,:], 
+    cvis_interp_stamp = interp1d(freq_LSRK_0[i,:], clean_vis_0[:,:,ixl:ixh,:], 
                                  axis=1, fill_value='extrapolate')
-    clean_vis_out[:,:,ixl:ixh,:] = fvis_interp_stamp(freq_out)
+    clean_vis_out[:,:,ixl:ixh,:] = cvis_interp_stamp(freq_out)
+    nvis_interp_stamp = interp1d(freq_LSRK_0[i,:], noisy_vis_0[:,:,ixl:ixh,:],
+                                 axis=1, fill_value='extrapolate')
+    noisy_vis_out[:,:,ixl:ixh,:] = nvis_interp_stamp(freq_out)
 
 
 ### Package data (both in .npz and .ms formats)

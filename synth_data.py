@@ -209,12 +209,12 @@ for i in range(nstamps):
     noisy_vis_out[:,:,ixl:ixh,:] = nvis_interp_stamp(freq_out)
 
 # Assign the weights
-weights_out = np.sqrt(1 / sigma_out) * np.ones((npol, in_.nchan_out, nvis))
+weights_out = np.sqrt(1 / sigma_out) * np.ones((npol, nvis))
 
 
 ### Package data (both in .npz and .ms formats)
-os.system('rm -rf data/'+in_.basename+'_tmp-'+in_.template+'.npz')
-np.savez('data/'+in_.basename+'_tmp-'+in_.template+'.npz', 
+os.system('rm -rf data/'+in_.basename+'-'+in_.template+'.npz')
+np.savez('data/'+in_.basename+'-'+in_.template+'.npz', 
          u=uu, v=vv, freq = freq_out, vel=vel_out, weights=weights_out,
          vis=clean_vis_out[:,:,:,0] + 1j*clean_vis_out[:,:,:,1],
          vis_noisy= noisy_vis_out[:,:,:,0] + 1j*noisy_vis_out[:,:,:,1])

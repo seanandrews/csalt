@@ -29,13 +29,8 @@ pars[2]  = 1.0		# stellar mass (Msun)
 pars[3]  = 200.		# "line radius" (AU)
 pars[4]  = 2.		# emission surface height at r_0 (AU)
 pars[5]  = 1.		# radial power-law index of emission surface height
-pars[6]  = np.inf	# outer disk flaring angle
-pars[7]  = 150.		# temperature at r_0 (K)
-pars[8]  = 0.5		# radial power-law index of temperature surface
-pars[9]  = np.inf	# outer disk temperature gradient
-pars[10] = 100.		# optical depth at r_0
-pars[11] = 0		# optical depth gradient
-pars[12] = np.inf	# outer disk optical depth gradient
+pars[6]  = 150.		# temperature at r_0 (K)
+pars[7]  = 0.5		# radial power-law index of temperature surface
 
 FOV = 8.
 Npix = 256

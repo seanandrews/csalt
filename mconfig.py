@@ -21,7 +21,7 @@ simobs_dir = '/pool/asha0/casa-release-5.7.2-4.el7/data/alma/simmos/'
 
 # Model parameters
 # ----------------
-npars = 13
+npars = 9
 pars  = np.zeros(npars)
 pars[0]  = 30.		# inclination angle (degrees)
 pars[1]  = 140.		# position angle (degrees)
@@ -31,6 +31,7 @@ pars[4]  = 2.		# emission surface height at r_0 (AU)
 pars[5]  = 1.		# radial power-law index of emission surface height
 pars[6]  = 150.		# temperature at r_0 (K)
 pars[7]  = 0.5		# radial power-law index of temperature surface
+pars[8]  = 20.		# maximum brightness temperature of back side
 
 FOV = 8.
 Npix = 256

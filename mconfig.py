@@ -19,9 +19,9 @@ overwrite_template = True
 simobs_dir = '/pool/asha0/casa-release-5.7.2-4.el7/data/alma/simmos/'
 
 
-# Model parameters
-# ----------------
-npars = 9
+# Model free parameters
+# ---------------------
+npars = 13
 pars  = np.zeros(npars)
 pars[0]  = 30.		# inclination angle (degrees)
 pars[1]  = 140.		# position angle (degrees)
@@ -32,41 +32,45 @@ pars[5]  = 1.		# radial power-law index of emission surface height
 pars[6]  = 150.		# temperature at r_0 (K)
 pars[7]  = 0.5		# radial power-law index of temperature surface
 pars[8]  = 20.		# maximum brightness temperature of back side
+pars[9]  = 300.		# line-width at r_0 (m/s)
+pars[10] = 4e3		# systemic velocity (m/s)
+pars[11] = 0.0		# RA offset (arcsec)
+pars[12] = 0.0		# DEC offset (arcsec)
 
-FOV = 8.
-Npix = 256
-dist = 150.
-rmax = 300.
+# Model fixed parameters
+# ----------------------
+# properties for sky-projected cube
+FOV  = 8.		# full field of view (arcsec)
+Npix = 256		# number of pixels per FOV
+dist = 150.		# distance (pc)
+rmax = 300.		# maximum radius of emission (au)
 
-chanstart_out = 3.65e3
-chanwidth_out = 80.
-nchan_out = 5
-RMS = 5.0
+# desired output LSRK velocity channels
+chanstart_out = 3.65e3	# m/s
+chanwidth_out = 80.	# m/s
+nchan_out = 5		# 
+
+# noise properties
+RMS = 5.0		# RMS noise per channel for natural-weight image (mJy)
  
 
 
-# Simulated observations parameters
+# Template observational parameters
 # ---------------------------------
 # spectral settings
-dfreq0   = 61.035e3    # in Hz
-restfreq = 230.538e9          # in Hz
-vtune    = 4.0e3
-vsys     = 4.0e3             # in m/s
-vspan    = 0.5e3             # in m/s
-spec_oversample = 3     
+dfreq0   = 61.035e3    	# native channel spacing (Hz)
+restfreq = 230.538e9  	# spectra line rest frequency (Hz)
+vtune    = 4.0e3	# LSRK velocity tuning for central channel (m/s)
+vspan    = 0.5e3     	# +/- velocity width around vtune for simulation (m/s)
+spec_oversample = 3   	# over-sampling factor for spectral signal processing
 
 # spatial settings
-RA   = '04:30:00.00'
-DEC  = '25:00:00.00'
-HA   = '0.0h'
-date = '2021/12/01'
+RA   = '04:30:00.00'	# phase center RA
+DEC  = '25:00:00.00'	# phase center DEC
+HA   = '0.0h'		# hour angle at start of EB
+date = '2021/12/01'	# UTC date for start of EB
 
 # observation settings
-config = '5'
-ttotal = '5min'
-integ  = '30s'
-
-
-
-
-
+config = '5'		# ALMA antenna configuration index (e.g., '5' = C43-5)
+ttotal = '5min'		# total EB time
+integ  = '30s'		# integration time

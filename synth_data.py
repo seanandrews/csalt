@@ -80,9 +80,9 @@ if gen_template:
     vel = in_.vtune + dv0 * (np.arange(nch) - np.int(nch/2) + 1)
 
     # Generate a dummy model .FITS cube
-    cube_parser(in_.pars, FOV=8, Npix=256, dist=150, r_max=300, 
-                restfreq=in_.restfreq, RA=RAdeg, DEC=DECdeg, Vsys=in_.vsys,
-                vel=vel, outfile=tpre+'.fits')
+    cube_parser(in_.pars[:in_.npars-3], FOV=8, Npix=256, dist=150, r_max=300, 
+                restfreq=in_.restfreq, RA=RAdeg, DEC=DECdeg, 
+                Vsys=in_.pars[10], vel=vel, outfile=tpre+'.fits')
 
     # Generate the (u,v) tracks and spectra on starting integration LSRK frame
     os.system('casa --nologger --nologfile -c CASA_scripts/mock_obs.py')
@@ -152,13 +152,13 @@ for i in range(nstamps):
     print('timestamp '+str(i+1)+' / '+str(nstamps))
 
     # create a model cube
-    cube = cube_parser(in_.pars, FOV=in_.FOV, Npix=in_.Npix, dist=in_.dist, 
-                       r_max=in_.rmax, Vsys=in_.vsys, vel=v_LSRK[i,:], 
-                       restfreq=in_.restfreq)
+    cube = cube_parser(in_.pars[:in_.npars-3], FOV=in_.FOV, Npix=in_.Npix, 
+                       dist=in_.dist, r_max=in_.rmax, Vsys=in_.pars[10], 
+                       vel=v_LSRK[i,:], restfreq=in_.restfreq)
 
     # sample it's Fourier transform on the template (u,v) spacings
-    mvis = vis_sample(imagefile=cube, uu=uu, vv=vv, mu_RA=0, mu_DEC=0, 
-                      mod_interp=False).T
+    mvis = vis_sample(imagefile=cube, uu=uu, vv=vv, mu_RA=in_.pars[11], 
+                      mu_DEC=in_.pars[12], mod_interp=False).T
 
     # populate the results in the output array *for this timestamp only*
     ixl, ixh = i * nperstamp, (i + 1) * nperstamp

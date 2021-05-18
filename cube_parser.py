@@ -26,8 +26,8 @@ def cube_parser(pars, FOV=8, Npix=128, dist=150, r_min=0, r_max=500, r0=10,
                        z0=pars[4], zpsi=pars[5], zphi=np.inf, 
                        Tb0=pars[6], Tbq=pars[7], Tbeps=np.inf, Tbmax=1000, 
                        Tbmax_b=pars[8], tau0=1000, tauq=0, taueta=np.inf, 
-                       taumax=10000, dV0=None, dVq=None, 
-                       dVmax=1000, xi_nt=0, FOV=FOV, Npix=Npix, mu_l=28)
+                       taumax=5000, dV0=pars[9], dVq=0.5*pars[7], dVmax=1000, 
+                       FOV=FOV, Npix=Npix)
 
 
     ### Set velocities for cube (either use the channels in an already-existing

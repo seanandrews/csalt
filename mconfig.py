@@ -15,6 +15,14 @@ gen_data = False
 fit_data = False
 overwrite_template = True
 
+# imaging
+do_img = ['', '_noisy']
+imsize = 256
+cell = '0.03arcsec'
+robust = 0.5
+thresh = '5.0mJy'
+cscales = [0, 5, 10, 15]
+
 # auxiliary file locations
 simobs_dir = '/pool/asha0/casa-release-5.7.2-4.el7/data/alma/simmos/'
 

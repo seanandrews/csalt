@@ -220,3 +220,8 @@ np.savez('data/'+in_.basename+'-'+in_.template+'.npz',
          vis_noisy= noisy_vis_out[:,:,:,0] + 1j*noisy_vis_out[:,:,:,1])
 
 os.system('casa --nologger --nologfile -c CASA_scripts/pack_data.py')
+
+
+### Image the simulations to check that they make sense
+if in_.do_img is not None:
+    os.system('casa --nologger --nologfile -c CASA_scripts/image_cube.py')

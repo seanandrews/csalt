@@ -6,12 +6,12 @@ import numpy as np
 
 
 # file naming
-basename = 'test'
-template = 'uvtest'
+basename = 'test_Sz129'
+template = 'Sz129'
 
 
 # controls
-gen_data = False
+gen_from_scratch = False
 fit_data = False
 overwrite_template = True
 
@@ -54,9 +54,9 @@ dist = 150.		# distance (pc)
 rmax = 300.		# maximum radius of emission (au)
 
 # desired output LSRK velocity channels
-chanstart_out = 3.65e3	# m/s
-chanwidth_out = 80.	# m/s
-nchan_out = 5		# 
+chanstart_out = -6.40e3	# m/s
+chanwidth_out = 320.	# m/s
+nchan_out = 65		# 
 
 # noise properties
 RMS = 5.0		# RMS noise per channel for natural-weight image (mJy)

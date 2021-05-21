@@ -213,6 +213,7 @@ weights_out = np.sqrt(1 / sigma_out) * np.ones((npol, nvis))
 
 
 ### Package data (both in .npz and .ms formats)
+os.system('cp mconfig.py mconfig_'+in_.basename+'-'+in_.template+'.py')
 os.system('rm -rf data/'+in_.basename+'-'+in_.template+'.npz')
 np.savez('data/'+in_.basename+'-'+in_.template+'.npz', 
          u=uu, v=vv, freq = freq_out, vel=vel_out, weights=weights_out,

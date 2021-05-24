@@ -357,7 +357,7 @@ def split_all_obs(msfile, nametemplate):
               spw = spw, 
               field = field, 
               outputvis = outputvis,
-              datacolumn='data')
+              datacolumn='data', keepflags=False)
 
     return len(obs_ids)
 

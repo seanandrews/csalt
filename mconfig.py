@@ -6,7 +6,9 @@ import numpy as np
 
 
 # model name
-basename = 'simp3'
+mdlname = 'simp3'
+extname = '_assigned_interp'
+basename = mdlname+extname
 
 # template setup
 duration = 'short'		
@@ -30,8 +32,6 @@ rms_opt = np.array([[40.7445, 28.8107, 20.3723],
 
 
 # controls
-gen_from_scratch = False
-fit_data = False
 overwrite_template = True
 
 # auxiliary file locations
@@ -41,11 +41,13 @@ simobs_dir = '/pool/asha0/casa-release-5.7.2-4.el7/data/alma/simmos/'
 # Model free parameters
 # ---------------------
 par_opt = np.array(['simp1', 'simp2', 'simp3', 'simp4', 'simp5'])
-pgrid = np.array([[40, 130, 0.1,  40, 3.0, 1,  35, 0.5, 20, 144, 5.2e3, 0, 0],
-                  [40, 130, 0.4, 115, 2.7, 1,  50, 0.5, 20, 172, 5.2e3, 0, 0],
-                  [40, 130, 0.7, 200, 2.3, 1,  65, 0.5, 20, 196, 5.2e3, 0, 0], 
-                  [40, 130, 1.0, 285, 2.0, 1,  75, 0.5, 20, 210, 5.2e3, 0, 0],
-                  [40, 130, 2.0, 540, 1.5, 1, 105, 0.5, 20, 249, 5.2e3, 0, 0]])
+pgrid = np.array([[40, 130, 0.1,  40, 3.0, 1, 130, 0.5, 20, 277, 5.2e3, 0, 0],
+                  [40, 130, 0.4, 115, 2.7, 1, 160, 0.5, 20, 307, 5.2e3, 0, 0],
+                  [40, 130, 0.7, 200, 2.3, 1, 205, 0.5, 20, 348, 5.2e3, 0, 0], 
+                  [40, 130, 1.0, 285, 2.0, 1, 240, 0.5, 20, 377, 5.2e3, 0, 0],
+                  [40, 130, 2.0, 540, 1.5, 1, 330, 0.5, 20, 442, 5.2e3, 0, 0]])
+pars = np.squeeze(pgrid[par_opt == mdlname, :])
+npars = len(pars)
 #pars[0]  = inclination angle (degrees)
 #pars[1]  = position angle (degrees)
 #pars[2]  = stellar mass (Msun)
@@ -60,21 +62,22 @@ pgrid = np.array([[40, 130, 0.1,  40, 3.0, 1,  35, 0.5, 20, 144, 5.2e3, 0, 0],
 #pars[11] =  RA offset (arcsec)
 #pars[12] = DEC offset (arcsec)
 
+
 # Model fixed parameters
 # ----------------------
 # properties for sky-projected cube
-FOV  = 8.		# full field of view (arcsec)
-Npix = 256		# number of pixels per FOV
+FOV  = 10.		# full field of view (arcsec)
+Npix = 512		# number of pixels per FOV
 dist = 150.		# distance (pc)
-rmax = 300.		# maximum radius of emission (au)
+rmax = 700.		# maximum radius of emission (au)
 
 # desired output LSRK velocity channels
-chanstart_out = -6.40e3	# m/s
-chanwidth_out = 320.	# m/s
-nchan_out = 65		# 
+chanstart_out = -4.8e3	# m/s
+#chanwidth_out = 320.	# m/s
+#nchan_out = 65		# 
 
 # noise properties (RMS per channel in naturally weighted images (mJy))
-RMS = rms_opt[t_key==duration, v_key==spectra_res][0]	
+RMS = rms_opt[t_key==duration, v_key==spectral_res][0]	
  
 
 
@@ -84,8 +87,8 @@ RMS = rms_opt[t_key==duration, v_key==spectra_res][0]
 dfreq0   = dv_opt[v_key==spectral_res][0]*1e3 	# native channel spacing (Hz)
 restfreq = 230.538e9  				# rest frequency (Hz)
 vtune    = 4.0e3	# LSRK velocity tuning for central channel (m/s)
-vspan    = 0.5e3     	# +/- velocity width around vtune for simulation (m/s)
-spec_oversample = 3   	# over-sampling factor for spectral signal processing
+vspan    = 12.5e3     	# +/- velocity width around vtune for simulation (m/s)
+spec_oversample = 5   	# over-sampling factor for spectral signal processing
 
 # spatial settings
 RA   = '16:00:00.00'	# phase center RA

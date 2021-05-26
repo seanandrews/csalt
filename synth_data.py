@@ -35,7 +35,7 @@ if np.logical_and(os.path.exists(tpre+'.ms'),
     # if the parameters are the same, use the existing one; otherwise, save
     # the old one under a previous name and proceed
     ip = [in_.RA, in_.DEC, in_.date, in_.HA, in_.config, in_.ttotal, 
-          in_.integ, str(in_.spec_oversample)]
+          in_.integ, str(in_.vtune), str(in_.vspan), str(in_.spec_oversample)]
     if tp == ip:
         print('This template already exists...using the files from %s' % \
               (time.ctime(os.path.getctime(tpre+'.ms'))))
@@ -68,10 +68,10 @@ DECdeg = np.sum(np.array(DEC_pieces) / [1., 60., 3600.])
 if gen_template: 
     # Create a template parameters file for records
     ip = [in_.RA, in_.DEC, in_.date, in_.HA, in_.config, in_.ttotal, 
-          in_.integ, in_.spec_oversample]
+          in_.integ, str(in_.vtune), str(in_.vspan), str(in_.spec_oversample)]
     f = open(tpre+'.params', 'w')
-    [f.write(ip[i]+'\n') for i in range(7)]
-    f.write(str(ip[-1]))
+    [f.write(ip[i]+'\n') for i in range(len(ip)-1)]
+    f.write(ip[-1])
     f.close()
 
     # Set the over-sampled (LSRK) channels for calculating the template
@@ -80,9 +80,10 @@ if gen_template:
     vel = in_.vtune + dv0 * (np.arange(nch) - np.int(nch/2) + 1)
 
     # Generate a dummy model .FITS cube
-    cube_parser(in_.pars[:in_.npars-3], FOV=8, Npix=256, dist=150, r_max=300, 
-                restfreq=in_.restfreq, RA=RAdeg, DEC=DECdeg, 
-                Vsys=in_.pars[10], vel=vel, outfile=tpre+'.fits')
+    cube_parser(in_.pars[:in_.npars-3], FOV=in_.FOV, Npix=in_.Npix, 
+                dist=in_.dist, r_max=in_.rmax, restfreq=in_.restfreq, 
+                RA=RAdeg, DEC=DECdeg, Vsys=in_.pars[10], vel=vel, 
+                outfile=tpre+'.fits')
 
     # Generate the (u,v) tracks and spectra on starting integration LSRK frame
     os.system('casa --nologger --nologfile -c CASA_scripts/mock_obs.py')
@@ -195,10 +196,16 @@ freq_LSRK_0 = tmp['freq_LSRK'][:,::in_.spec_oversample]
 # CASA/mstransform to go from TOPO --> the specified LSRK channels when the 
 # output LSRK channel spacing is <2x the TOPO channel spacing; that is what we 
 # want to do with real data, so we have a good model for the covariance matrix)
-vel_out = in_.chanstart_out + in_.chanwidth_out * np.arange(in_.nchan_out)
+#
+# set output velocity and frequency grids, maintaining native spacing
+dvel0 = c_.c * (in_.dfreq0 / in_.restfreq)
+nch_out = 2 * np.int((in_.pars[10] - in_.chanstart_out) / dvel0)
+vel_out = in_.chanstart_out + dvel0 * np.arange(nch_out)
 freq_out = in_.restfreq * (1 - vel_out / c_.c)
-clean_vis_out = np.empty((npol, in_.nchan_out, nvis, 2))
-noisy_vis_out = np.empty((npol, in_.nchan_out, nvis, 2))
+
+# populate the interpolated visibility grids
+clean_vis_out = np.empty((npol, nch_out, nvis, 2))
+noisy_vis_out = np.empty((npol, nch_out, nvis, 2))
 for i in range(nstamps):
     ixl, ixh = i * nperstamp, (i + 1) * nperstamp
     cvis_interp_stamp = interp1d(freq_LSRK_0[i,:], clean_vis_0[:,:,ixl:ixh,:], 
@@ -213,7 +220,7 @@ weights_out = np.sqrt(1 / sigma_out) * np.ones((npol, nvis))
 
 
 ### Package data (both in .npz and .ms formats)
-os.system('cp mconfig.py mconfig_'+in_.basename+'-'+in_.template+'.py')
+os.system('cp mconfig.py data/mconfig_'+in_.basename+'-'+in_.template+'.py')
 os.system('rm -rf data/'+in_.basename+'-'+in_.template+'.npz')
 np.savez('data/'+in_.basename+'-'+in_.template+'.npz', 
          u=uu, v=vv, freq = freq_out, vel=vel_out, weights=weights_out,

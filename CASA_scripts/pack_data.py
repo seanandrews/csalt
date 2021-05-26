@@ -7,14 +7,18 @@ execfile('const.py')
 The first step is to spectrally regrid the template MS onto the desired output
 LSRK channels for formatting purposes.  
 """
+# assign velocity grid parameters
+dvel0 = c * (dfreq0 / restfreq)
+nch_out = 2 * np.int( (pars[10] - chanstart_out) / dvel0 )
+
 # regrid (linear interpolation) onto desired output LSRK channels
 os.system('rm -rf data/'+basename+'-'+template+'.ms*')
 mstransform(vis='obs_templates/'+template+'.ms', 
             outputvis='data/'+basename+'-'+template+'.ms', 
             datacolumn='data', regridms=True, mode='velocity', 
-            outframe='LSRK', veltype='radio', nchan=nchan_out,
+            outframe='LSRK', veltype='radio', nchan=nch_out,
             start=str(chanstart_out / 1e3)+'km/s', 
-            width=str(chanwidth_out / 1e3)+'km/s', 
+            width=str(dvel0 / 1e3)+'km/s', 
             restfreq=str(restfreq / 1e9)+'GHz')
 
 # copy this to a noisy MS file

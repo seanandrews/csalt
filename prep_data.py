@@ -3,14 +3,15 @@ import numpy as np
 
 
 class vdata:
-   def __init__(vis, wgt, vel, vobs, vmod, cov, cov_inv, lnL0):
+   def __init__(self, u, v, vis, wgt, vel, vobs, vmod, cov, lnL0):
+        self.u = u
+        self.v = v
         self.vis = vis
         self.wgt = wgt
         self.vel = vel
         self.vobs = vobs
         self.vmod = vmod
         self.cov = cov
-        self.cov_inv = cov_inv
         self.lnL0 = lnL0
 
 
@@ -100,7 +101,6 @@ def prep_data(file_prefix, vra=None, chbin=2, chpad=3, restfreq=230.538e9):
     ### Pre-calculate important inference quantities
     # covariance matrix and its inverse
     cov = (5./16)*np.eye(Nch) + (3./32)*(np.eye(Nch, k=-1) + np.eye(Nch, k=1))
-    cov_inv = np.linalg.inv(cov)
 
     # log-likelihood normalization
     dterm = np.empty((npol, nvis))
@@ -112,4 +112,4 @@ def prep_data(file_prefix, vra=None, chbin=2, chpad=3, restfreq=230.538e9):
 
 
     ### Package everything we need into a data class and return it
-    return vdata(vis_bin, wgt_bin, vel_bin, vobs, vmod, cov, cov_inv, lnL0)   
+    return vdata(iu, iv, vis_bin, wgt_bin, vel_bin, vobs, vmod, cov, lnL0)

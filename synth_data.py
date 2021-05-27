@@ -191,6 +191,7 @@ noisy_vis_SRF = convolve1d(noisy_vis, SRF/np.sum(SRF), axis=1, mode='nearest')
 clean_vis_0 = clean_vis_SRF[:,::in_.spec_oversample,:,:]
 noisy_vis_0 = noisy_vis_SRF[:,::in_.spec_oversample,:,:]
 freq_LSRK_0 = tmp['freq_LSRK'][:,::in_.spec_oversample]
+vel_LSRK_0 = v_LSRK[:,::in_.spec_oversample]
 
 # Interpolate onto desired output channels (this is what happens when you use 
 # CASA/mstransform to go from TOPO --> the specified LSRK channels when the 
@@ -224,6 +225,7 @@ os.system('cp mconfig.py data/mconfig_'+in_.basename+'-'+in_.template+'.py')
 os.system('rm -rf data/'+in_.basename+'-'+in_.template+'.npz')
 np.savez('data/'+in_.basename+'-'+in_.template+'.npz', 
          u=uu, v=vv, freq = freq_out, vel=vel_out, weights=weights_out,
+         freq_LSRK_grid=freq_LSRK_0, vel_LSRK_grid=vel_LSRK_0,
          vis=clean_vis_out[:,:,:,0] + 1j*clean_vis_out[:,:,:,1],
          vis_noisy= noisy_vis_out[:,:,:,0] + 1j*noisy_vis_out[:,:,:,1])
 

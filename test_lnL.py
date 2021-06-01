@@ -45,6 +45,8 @@ def lnprob(data, theta, theta_fixed, gcf_holder=None, corr_cache=None):
                           weights=mwgt.reshape((-1, chbin, mwgt.shape[1])), 
                           axis=1)
 
+    print(mvis_bin.shape)
+
     # compute the unnormalized log-likelihood for each polarization
     Minv = np.linalg.inv(data.cov)
     lnL = 0

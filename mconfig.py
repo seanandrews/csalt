@@ -6,33 +6,10 @@ import numpy as np
 
 
 # model name
-mdlname = 'simp3'
-extname = '_assigned_interp'
-basename = mdlname+extname
+basename = 'modeltest'
 
 # template setup
-duration = 'short'		
-spatial_res = 'medr'		
-spectral_res = 'medv'		
-template = duration+'_'+spatial_res+'_'+spectral_res
-
-
-# observational configuration
-t_key = np.array(['snap', 'short', 'long', 'deep'])
-r_key = np.array(['highr', 'medr', 'lowr'])
-v_key = np.array(['highv', 'medv', 'lowv'])
-
-dt_opt = np.array(['1min', '15min', '60min', '180min'])
-dr_opt = np.array(['4', '6', '8'])
-dv_opt = np.array([61.03515625, 122.0703125, 244.140625])
-rms_opt = np.array([[40.7445, 28.8107, 20.3723], 
-                    [10.5202,  7.4389,  5.2600],
-                    [ 5.2600,  3.7194,  2.6300],
-                    [ 3.0369,  2.1474,  1.5185]])
-
-
-# controls
-overwrite_template = True
+template = 'templatetest'
 
 # auxiliary file locations
 simobs_dir = '/pool/asha0/casa-release-5.7.2-4.el7/data/alma/simmos/'
@@ -40,13 +17,7 @@ simobs_dir = '/pool/asha0/casa-release-5.7.2-4.el7/data/alma/simmos/'
 
 # Model free parameters
 # ---------------------
-par_opt = np.array(['simp1', 'simp2', 'simp3', 'simp4', 'simp5'])
-pgrid = np.array([[40, 130, 0.1,  40, 3.0, 1, 130, 0.5, 20, 277, 5.2e3, 0, 0],
-                  [40, 130, 0.4, 115, 2.7, 1, 160, 0.5, 20, 307, 5.2e3, 0, 0],
-                  [40, 130, 0.7, 200, 2.3, 1, 205, 0.5, 20, 348, 5.2e3, 0, 0], 
-                  [40, 130, 1.0, 285, 2.0, 1, 240, 0.5, 20, 377, 5.2e3, 0, 0],
-                  [40, 130, 2.0, 540, 1.5, 1, 330, 0.5, 20, 442, 5.2e3, 0, 0]])
-pars = np.squeeze(pgrid[par_opt == mdlname, :])
+pars = np.array([40, 130, 0.7, 200, 2.3, 1, 205, 0.5, 20, 348, 5.2e3, 0, 0])
 npars = len(pars)
 #pars[0]  = inclination angle (degrees)
 #pars[1]  = position angle (degrees)
@@ -73,19 +44,17 @@ rmax = 700.		# maximum radius of emission (au)
 
 # desired output LSRK velocity channels
 chanstart_out = -4.8e3	# m/s
-#chanwidth_out = 320.	# m/s
-#nchan_out = 65		# 
 
 # noise properties (RMS per channel in naturally weighted images (mJy))
-RMS = rms_opt[t_key==duration, v_key==spectral_res][0]	
+RMS = 5.3
  
 
 
 # Template observational parameters
 # ---------------------------------
 # spectral settings
-dfreq0   = dv_opt[v_key==spectral_res][0]*1e3 	# native channel spacing (Hz)
-restfreq = 230.538e9  				# rest frequency (Hz)
+dfreq0   = 122.0703125*1e3 	# native channel spacing (Hz)
+restfreq = 230.538e9  		# rest frequency (Hz)
 vtune    = 4.0e3	# LSRK velocity tuning for central channel (m/s)
 vspan    = 12.5e3     	# +/- velocity width around vtune for simulation (m/s)
 spec_oversample = 5   	# over-sampling factor for spectral signal processing
@@ -97,9 +66,9 @@ HA   = '0.0h'		# hour angle at start of EB
 date = '2022/05/20'	# UTC date for start of EB
 
 # observation settings
-config = dr_opt[r_key==spatial_res][0]		# antenna config ('5' = C43-5)
-ttotal = dt_opt[t_key==duration][0]		# total EB time
-integ  = '30s'					# integration time
+config = '5'		# antenna config ('5' = C43-5)
+ttotal = '15min'	# total EB time
+integ  = '30s'		# integration time
 
 # imaging
 do_img = ['', '_noisy']

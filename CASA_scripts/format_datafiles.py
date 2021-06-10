@@ -1,19 +1,10 @@
 import os, sys
 import numpy as np
-
-inp_MS = '/data/sandrews/LP/sa_work/Sz129/Sz129_combined_CO_selfcal.ms.contsub'
-basename = 'Sz129'
-odir = 'data/'+basename+'/'
-tmpEBs = odir+basename+'_init'
-pre_out = odir+basename+'_EB'
-restfreq = 230.538e9
-bounds_V = [-10e3, 10e3]
-chpad = 5
-tavg = '30s'
-
-c_ = 2.99792e8
+execfile('const.py')
+execfile('fconfig.py')
 
 
+# Introduce a data class for more accessible storage
 class vdata:
    def __init__(self, u, v, vis, wgt, nu_topo, nu_lsrk):
         self.u = u
@@ -24,17 +15,13 @@ class vdata:
         self.nu_lsrk = nu_lsrk
 
 
-# Make sure odir exists
-if not os.path.exists(odir):
-    os.system('mkdir '+odir)
+# Make sure outdir exists
+if not os.path.exists(outdir):
+    os.system('mkdir '+outdir)
 
 
-""" 
-Start by time-averaging a self-calibrated composite MS, and splitting it into
-the constituent EBs.
-"""
 # Load original MS datafile
-tb.open(inp_MS)
+tb.open(orig_MS)
 spw_col = tb.getcol('DATA_DESC_ID')
 obs_col = tb.getcol('OBSERVATION_ID')
 field_col = tb.getcol('FIELD_ID')
@@ -58,46 +45,46 @@ for i in obs_ids:
     else:
         field_str = "%d~%d" % (fields[0], fields[-1])
 
-    os.system('rm -rf '+tmpEBs+str(i)+'.ms*')
-    split(vis=inp_MS, spw=spw_str, field=field_str, datacolumn='data',
-          timebin=tavg, keepflags=False, outputvis=tmpEBs+str(i)+'.ms')
+    os.system('rm -rf '+dataname+'_tmp'+str(i)+'.ms*')
+    split(vis=orig_MS, outputvis=dataname+'_tmp'+str(i)+'.ms', spw=spw_str, 
+          field=field_str, datacolumn='data', timebin=tavg, keepflags=False)
 
 
-#nEB = 4
+# Create a data dictionary
+data_dict = {'nobs': nEB, 
+             'orig_datafile': orig_MS, 
+             'nu_rest': nu_rest,
+             'bounds_V': bounds_V,
+             'chpad': chpad,
+             'tavg': tavg}
 
 
-# create a data dictionary
-data_dict = {"nobs": 4}
-
+# Loop through each EB
 for i in range(nEB):
 
-    print(i)
-
-    # get data, timestamps
-    tb.open(tmpEBs+str(i)+'.ms')
+    # Get data, timestamps
+    tb.open(dataname+'_tmp'+str(i)+'.ms')
     data_all = np.squeeze(tb.getcol('DATA'))
-    uvw = tb.getcol('UVW')
+    u, v = tb.getcol('UVW')[0,:], tb.getcol('UVW')[1,:]
     weights = tb.getcol('WEIGHT')
     tstamps = np.unique(tb.getcol('TIME'))
     tb.close()
 
-    # get TOPO frequencies
-    tb.open(tmpEBs+str(i)+'.ms/SPECTRAL_WINDOW')
+    # Get TOPO frequencies
+    tb.open(dataname+'_tmp'+str(i)+'.ms/SPECTRAL_WINDOW')
     nu_TOPO_all = np.squeeze(tb.getcol('CHAN_FREQ'))
     tb.close()
 
-    # calculate LSRK frequencies for each timestamp
+    # Calculate LSRK frequencies for each timestamp
     nu_LSRK_all = np.empty((len(tstamps), len(nu_TOPO_all)))
-    print(nu_LSRK_all.shape)
-    ms.open(tmpEBs+str(i)+'.ms')
+    ms.open(dataname+'_tmp'+str(i)+'.ms')
     for j in range(len(tstamps)):
         nu_LSRK_all[j,:] = ms.cvelfreqs(mode='channel', outframe='LSRK', 
                                         obstime=str(tstamps[j])+'s')
     ms.close()
-    print(nu_LSRK_all.shape)
 
-    # identify channel boundaries for the requested LSRK range
-    V_LSRK_all = c_ * (1 - nu_LSRK_all / restfreq)
+    # Identify channel boundaries for the requested LSRK range
+    V_LSRK_all = c_ * (1 - nu_LSRK_all / nu_rest)
     chslo = np.argmin(np.abs(V_LSRK_all - bounds_V[0]), axis=1)
     chshi = np.argmin(np.abs(V_LSRK_all - bounds_V[1]), axis=1)
     if np.diff(nu_TOPO_all)[0] < 0:
@@ -105,18 +92,28 @@ for i in range(nEB):
     else:
         chlo, chhi = chslo.max(), chshi.min()	# <--- revisit this!
 
-    # slice out the data of interest
+    # Slice out the data of interest
     nu_TOPO = nu_TOPO_all[chlo-chpad:chhi+chpad+1]
     nu_LSRK = nu_LSRK_all[:,chlo-chpad:chhi+chpad+1]
     data = data_all[:,chlo-chpad:chhi+chpad+1,:]
 
-    # parse visibility weights if they do not have a spectral dependence
-    print('gonna tile')
+    # Parse visibility weights if they do not have a spectral dependence
     if weights.shape != data.shape:
         weights = np.rollaxis(np.tile(weights, (len(nu_TOPO), 1, 1)), 1)
 
-    # pack into a data object, store as .npz, and update the dictionary
-    print('gonna class')
-    out_data = vdata(uvw[0,:], uvw[1,:], data, weights, nu_TOPO, nu_LSRK)
-    print('gonna save')
-    np.savez(pre_out+str(i), data=out_data)
+    # Pack a data object into the dictionary
+    data_dict[str(i)] = vdata(u, v, data, weights, nu_TOPO, nu_LSRK)
+
+    # Split off a MS with the data of interest (for future imaging use)
+    os.system('rm -rf '+dataname+'_EB'+str(i)+'.ms*')
+    split(vis=dataname+'_tmp'+str(i)+'.ms', 
+          outputvis=dataname+'_EB'+str(i)+'.ms',
+          datacolumn='data', spw='0:'+str(chlo-chpad)+'~'+str(chhi+chpad))
+
+    # Clean up temporary MS files
+    if not preserve_tmp:
+        os.system('rm -rf '+dataname+'_tmp'+str(i)+'.ms*')
+
+
+# Save the data dictionary
+np.savez_compressed(dataname, data=data_dict)

@@ -7,7 +7,7 @@ import numpy as np
 
 # model name
 mdlname = 'simp3'
-extname = '_assigned'
+extname = ''
 basename = mdlname+extname
 
 # template setup
@@ -88,13 +88,19 @@ dfreq0   = dv_opt[v_key==spectral_res][0]*1e3 	# native channel spacing (Hz)
 restfreq = 230.538e9  				# rest frequency (Hz)
 vtune    = 4.0e3	# LSRK velocity tuning for central channel (m/s)
 vspan    = 12.5e3     	# +/- velocity width around vtune for simulation (m/s)
-spec_oversample = 5   	# over-sampling factor for spectral signal processing
+spec_over = 5   	# over-sampling factor for spectral signal processing
 
 # spatial settings
 RA   = '16:00:00.00'	# phase center RA
 DEC  = '-40:00:00.00'	# phase center DEC
 HA   = '0.0h'		# hour angle at start of EB
 date = '2022/05/20'	# UTC date for start of EB
+
+RA_pieces = [np.float(RA.split(':')[i]) for i in np.arange(3)]
+RAdeg = 15 * np.sum(np.array(RA_pieces) / [1., 60., 3600.])
+DEC_pieces = [np.float(DEC.split(':')[i]) for i in np.arange(3)]
+DECdeg = np.sum(np.array(DEC_pieces) / [1., 60., 3600.])
+
 
 # observation settings
 config = dr_opt[r_key==spatial_res][0]		# antenna config ('5' = C43-5)

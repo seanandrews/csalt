@@ -13,7 +13,7 @@ import numpy as np
 from astropy.io import fits
 from vis_sample.classes import *
 from simple_disk import simple_disk
-import const as c_
+import const as const
 
 
 def cube_parser(pars, FOV=8, Npix=128, dist=150, r_min=0, r_max=500, r0=10,
@@ -36,9 +36,9 @@ def cube_parser(pars, FOV=8, Npix=128, dist=150, r_min=0, r_max=500, r0=10,
         hd = fits.open(datafile)[0].header
         f0, ix, nf, df = hd['CRVAL4'], hd['CRPIX4'], hd['NAXIS4'], hd['CDELT4']
         freqs = f0 + (np.arange(nf) - ix + 1) * df
-        vel = c_.c * (1 - freqs / restfreq)
+        vel = const.c_ * (1 - freqs / restfreq)
     else:
-        freqs = restfreq * (1 - vel / c_.c)     
+        freqs = restfreq * (1 - vel / const.c_)     
 
     # adjust for systemic velocity
     vlsr = vel - Vsys
@@ -50,7 +50,7 @@ def cube_parser(pars, FOV=8, Npix=128, dist=150, r_min=0, r_max=500, r0=10,
     # convert from brightness temperatures to Jy / pixel
     pixel_area = (disk.cell_sky * np.pi / (180 * 3600))**2
     for i in range(len(freqs)):
-        cube[i,:,:] *= 1e26 * pixel_area * 2 * freqs[i]**2 * c_.k / c_.c**2
+        cube[i,:,:] *= 1e26 * pixel_area * 2 * freqs[i]**2 * const.k_ / const.c_**2
 
 
     ### Prepare the output: either into the specified .FITS file or into a 

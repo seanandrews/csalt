@@ -2,61 +2,75 @@
 Generate a template MS and associated information file for use in a synthetic
 data product.
 """
-
 import os
 import numpy as np
-execfile('mconfig.py')
+execfile('synth_config.py')
 execfile('const.py')
 
-# generate the MS structure
-os.chdir('obs_templates/sims/')
-simobserve(project=template+'.sim', skymodel='../'+template+'.fits', 
+
+### Simulation setups
+os.chdir('obs_templates')
+
+# Number of channels needed to span the desired velocity range
+nch = 2 * np.int(vspan / (c_ * dfreq0 / restfreq)) + 1
+
+# TOPO frequency corresponding to desired tuning velocity (center of SPW)
+t0 = au.lstToUT(au.hoursToHMS(RAdeg / 15 + np.float(HA[:-1])), date)
+dt = t0[0][:-3].replace('-', '/').replace(' ','/')
+nu_tune = au.restToTopo(restfreq, 1e-3 * vtune, dt, RA, DEC)
+
+# Generate a dummy cube
+dummy = ia.makearray(v=0.001, shape=[64, 64, 4, nch])  
+res = ia.fromarray(outfile='dummy.image', pixels=dummy, overwrite=True)  
+ia.done()
+
+
+
+### Simulate observations to generate the MS structure
+os.chdir('sims')
+
+# Run the simulation
+simobserve(project=template+'.sim', #skymodel='../'+template+'.fits', 
+           skymodel='../dummy.image',
            antennalist=simobs_dir+'alma.cycle7.'+config+'.cfg',
-           totaltime=ttotal, integration=integ, thermalnoise='', refdate=date, 
-           hourangle=HA, mapsize='10arcsec')
+           totaltime=ttotal, integration=integ, thermalnoise='', 
+           indirection='J2000 '+RA+' '+DEC, incell='0.02arcsec',
+           incenter=str(nu_tune/1e9)+'GHz', inwidth=str(dfreq0 * 1e-3)+'kHz', 
+           refdate=date, hourangle=HA, mapsize='10arcsec', outframe='TOPO')
 os.chdir('../')
 
-# grab the simulated MS, store it in obs_template with appropriate name 
-sim_MS = 'sims/'+template+'.sim/'+template+'.sim.alma.cycle7.'+config+'.ms'
+# Store the simulated MS in obs_template
 os.system('rm -rf '+template+'.ms*')
+sim_MS = 'sims/'+template+'.sim/'+template+'.sim.alma.cycle7.'+config+'.ms'
 os.system('mv '+sim_MS+' '+template+'.ms')
 
-# open the MS table and extract the relevant information
+
+
+### Extract the MS contents for easier access
+
+# Data structures and unique timestamps (s in UTC MJD) 
 tb.open(template+'.ms')
 data = np.squeeze(tb.getcol("DATA"))
-uvw = tb.getcol("UVW")
-weights = tb.getcol("WEIGHT")
-times = tb.getcol("TIME")
+u, v = tb.getcol('UVW')[0,:], tb.getcol('UVW')[1,:]
+weights = tb.getcol('WEIGHT')
+tstamps = np.unique(tb.getcol("TIME"))
 tb.close()
 
-# open the MS table and extract the channel frequencies 
+# TOPO frequency channels (Hz)
 tb.open(template+'.ms/SPECTRAL_WINDOW')
-nchan = tb.getcol('NUM_CHAN').tolist()[0]
-freqlist = np.squeeze(tb.getcol("CHAN_FREQ"))
+nu_TOPO = np.squeeze(tb.getcol('CHAN_FREQ'))
 tb.close()
 
-# identify unique timestamps (in MJD)
-tstamps = np.unique(times)
+# LSRK frequencies (Hz) for each timestamp
+nu_LSRK = np.empty((len(tstamps), len(nu_TOPO)))
+ms.open(template+'.ms')
+for j in range(len(tstamps)):
+    nu_LSRK[j,:] = ms.cvelfreqs(mode='channel', outframe='LSRK',
+                                    obstime=str(tstamps[j])+'s')
+ms.close()
 
-# get a date/time string corresponding to the start of the EB
-datetime0 = au.mjdsecToTimerangeComponent(tstamps[0])
+# Record the results
+np.savez(template+'.npz', data=data, u=u, v=v, weights=weights, 
+                          nu_TOPO=nu_TOPO, nu_LSRK=nu_LSRK)
 
-### "Doppler setting"
-# set the fixed TOPO channel frequencies (at the start of the EB) 
-# and their corresponding LSRK frequencies at each timestamp
-freq_TOPO = np.empty(nchan)
-for j in range(nchan):
-    freq_TOPO[j] = au.restToTopo(restfreq, 
-                                 1e-3 * c * (1 - freqlist[j] / restfreq),
-                                 datetime0, RA, DEC)
-
-freq_LSRK = np.empty((len(tstamps), nchan))
-for i in range(len(tstamps)):
-    datetimei = au.mjdsecToTimerangeComponent(tstamps[i])
-    for j in range(nchan):
-        freq_LSRK[i,j] = au.topoToLSRK(freq_TOPO[j], datetimei, RA, DEC)
-
-
-# record the outputs in a more easily-accessed file (outside CASA)
-np.savez(template+'.npz', data=data, uvw=uvw, weights=weights, 
-                          freq_TOPO=freq_TOPO, freq_LSRK=freq_LSRK)
+os.chdir('../')

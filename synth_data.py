@@ -91,7 +91,6 @@ t_nu_TOPO, t_nu_LSRK = tmp['nu_TOPO'], tmp['nu_LSRK']
 npol, nch, nvis = t_data.shape[0], t_data.shape[1], t_data.shape[2]
 nstamps = t_nu_LSRK.shape[0]
 
-print(npol, nch, nvis, nstamps)
 
 
 # Spatial frequencies (lambda units) [nvis-length vectors]
@@ -184,50 +183,22 @@ nu_LSRK = nu_LSRK[:,::inp.spec_over]
 vel_LSRK = v_LSRK[:,::inp.spec_over]
 
 
-print(clean_vis.shape, nu_LSRK.shape)
-
-
-sys.exit()
-
-# Interpolate onto desired output channels (this is what happens when you use 
-# CASA/mstransform to go from TOPO --> the specified LSRK channels when the 
-# output LSRK channel spacing is <2x the TOPO channel spacing; that is what we 
-# want to do with real data, so we have a good model for the covariance matrix)
-#
-# set output velocity and frequency grids, maintaining native spacing
-dvel0 = c_.c * (inp.dfreq0 / inp.restfreq)
-nch_out = 2 * np.int((inp.pars[10] - inp.chanstart_out) / dvel0)
-vel_out = inp.chanstart_out + dvel0 * np.arange(nch_out)
-freq_out = inp.restfreq * (1 - vel_out / c_.c)
-
-# populate the interpolated visibility grids
-clean_vis_out = np.empty((npol, nch_out, nvis, 2))
-noisy_vis_out = np.empty((npol, nch_out, nvis, 2))
-for i in range(nstamps):
-    ixl, ixh = i * nperstamp, (i + 1) * nperstamp
-    cvis_interp_stamp = interp1d(freq_LSRK[i,:], clean_vis[:,:,ixl:ixh,:], 
-                                 axis=1, fill_value='extrapolate')
-    clean_vis_out[:,:,ixl:ixh,:] = cvis_interp_stamp(freq_out)
-    nvis_interp_stamp = interp1d(freq_LSRK[i,:], noisy_vis[:,:,ixl:ixh,:],
-                                 axis=1, fill_value='extrapolate')
-    noisy_vis_out[:,:,ixl:ixh,:] = nvis_interp_stamp(freq_out)
-
 # Assign the weights
 weights_out = np.sqrt(1 / sigma_out) * np.ones((npol, nvis))
 
 
 ### Package data (both in .npz and .ms formats)
-os.system('cp mconfig.py data/mconfig_'+inp.basename+'-'+inp.template+'.py')
-os.system('rm -rf data/'+inp.basename+'-'+inp.template+'.npz')
-np.savez('data/'+inp.basename+'-'+inp.template+'.npz', 
-         u=uu, v=vv, freq = freq_out, vel=vel_out, weights=weights_out,
-         freq_LSRK_grid=freq_LSRK, vel_LSRK_grid=vel_LSRK,
-         vis=clean_vis_out[:,:,:,0] + 1j*clean_vis_out[:,:,:,1],
-         vis_noisy= noisy_vis_out[:,:,:,0] + 1j*noisy_vis_out[:,:,:,1])
+if not os.path.exists('storage/'+inp.basename):
+    os.system('mkdir storage/'+inp.basename)
+
+os.system('cp synth_config.py storage/'+inp.basename+'/synth_config_'+\
+          inp.basename+'-'+inp.template+'.py')
+os.system('rm -rf storage/'+inp.basename+'/'+inp.basename+'-'+\
+          inp.template+'.npz')
+np.savez('storage/'+inp.basename+'/'+inp.basename+'-'+inp.template+'.npz', 
+         u=uu, v=vv, weights=weights_out, 
+         freq_LSRK_grid=nu_LSRK, vel_LSRK_grid=vel_LSRK,
+         vis=clean_vis[:,:,:,0] + 1j*clean_vis[:,:,:,1],
+         vis_noisy= noisy_vis[:,:,:,0] + 1j*noisy_vis[:,:,:,1])
 
 os.system('casa --nologger --nologfile -c CASA_scripts/pack_data.py')
-
-
-### Image the simulations to check that they make sense
-if inp.do_img is not None:
-    os.system('casa --nologger --nologfile -c CASA_scripts/image_cube.py')

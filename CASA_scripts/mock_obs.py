@@ -74,3 +74,5 @@ np.savez(template+'.npz', data=data, u=u, v=v, weights=weights,
                           nu_TOPO=nu_TOPO, nu_LSRK=nu_LSRK)
 
 os.chdir('../')
+
+os.system('rm -rf *.last')

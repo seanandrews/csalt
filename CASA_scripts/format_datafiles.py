@@ -4,17 +4,6 @@ execfile('const.py')
 execfile('fconfig.py')
 
 
-# Introduce a data class for more accessible storage
-class vdata:
-   def __init__(self, u, v, vis, wgt, nu_topo, nu_lsrk):
-        self.u = u
-        self.v = v
-        self.vis = vis
-        self.wgt = wgt
-        self.nu_topo = nu_topo
-        self.nu_lsrk = nu_lsrk
-
-
 # Make sure outdir exists
 if not os.path.exists(outdir):
     os.system('mkdir '+outdir)
@@ -57,6 +46,7 @@ data_dict = {'nobs': nEB,
              'bounds_V': bounds_V,
              'chpad': chpad,
              'tavg': tavg}
+np.save(dataname, data_dict)
 
 
 # Loop through each EB
@@ -90,7 +80,7 @@ for i in range(nEB):
     if np.diff(nu_TOPO_all)[0] < 0:
         chlo, chhi = chslo.min(), chshi.max()
     else:
-        chlo, chhi = chslo.max(), chshi.min()	# <--- revisit this!
+        chlo, chhi = chshi.min(), chslo.max()	
 
     # Slice out the data of interest
     nu_TOPO = nu_TOPO_all[chlo-chpad:chhi+chpad+1]
@@ -101,8 +91,10 @@ for i in range(nEB):
     if weights.shape != data.shape:
         weights = np.rollaxis(np.tile(weights, (len(nu_TOPO), 1, 1)), 1)
 
-    # Pack a data object into the dictionary
-    data_dict[str(i)] = vdata(u, v, data, weights, nu_TOPO, nu_LSRK)
+    # Pack a data object into an .npz file
+    os.system('rm -rf '+dataname+'_EB'+str(i)+'.npz')
+    np.savez_compressed(dataname+'_EB'+str(i), u=u, v=v, data=data, 
+                        weights=weights, nu_TOPO=nu_TOPO, nu_LSRK=nu_LSRK)
 
     # Split off a MS with the data of interest (for future imaging use)
     os.system('rm -rf '+dataname+'_EB'+str(i)+'.ms*')
@@ -114,6 +106,4 @@ for i in range(nEB):
     if not preserve_tmp:
         os.system('rm -rf '+dataname+'_tmp'+str(i)+'.ms*')
 
-
-# Save the data dictionary
-np.savez_compressed(dataname, data=data_dict)
+os.system('rm -rf *.last')

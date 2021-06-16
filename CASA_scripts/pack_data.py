@@ -31,3 +31,5 @@ tb.putcol("DATA", ivis_noisy)
 tb.putcol("WEIGHT", iwgt)
 tb.flush()
 tb.close()
+
+os.system('rm -rf *.last')

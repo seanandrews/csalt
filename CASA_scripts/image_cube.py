@@ -1,38 +1,35 @@
 import os, sys
 import numpy as np
-execfile('mconfig.py')
-execfile('const.py')
 execfile('/home/sandrews/mypy/keplerian_mask/keplerian_mask.py')
 
 
-ivel = (np.load('data/'+basename+'-'+template+'.npz'))['vel']
-dvel0 = np.diff(ivel)[0]
+def generate_kepmask(name, mask_pars, subname=''):
 
-# file extensions (for tidiness)
-ext = ['.image', '.mask', '.model', '.pb', '.psf', '.residual', '.sumwt']
+    # load the config file corresponding to this basename
+    execfile('fconfig_'+name+'.py')
 
-
-# loop through MS files to image
-for i in do_img:
-
-    # image filename format
-    fname = 'im_'+basename+'-'+template+i
-
-    # channel assignments
-    #dvel0 = c * (dfreq0 / restfreq)
-    #nch_out = 2 * np.int((pars[10] - chanstart_out) / dvel0)
-
-    # make a dirty image (to guide a mask)
+    # remove lingering files from previous runs
+    ext = ['.image', '.mask', '.model', '.pb', '.psf', '.residual', '.sumwt']
     for j in ext:
-        os.system('rm -rf data/images/'+fname+'_dirty'+j)
-    tclean(vis='data/'+basename+'-'+template+i+'.ms',
-           imagename='data/images/'+fname+'_dirty',
-           specmode='cube', start=str(ivel[0]/1e3)+'km/s', 
-           width=str(dvel0/1e3)+'km/s', nchan=len(ivel), 
-           outframe='LSRK', restfreq=str(restfreq/1e9)+'GHz',
-           imsize=imsize, cell=cell, deconvolver='multiscale', scales=cscales,
-           niter=0, weighting='briggs', robust=robust, interactive=False,
-           nterms=1, restoringbeam='common')
+        os.system('rm -rf '+dataname+subname+j)
+
+    # make a dirty image cube to guide the mask
+    tclean(vis=dataname+subname+'.ms', imagename=dataname+subname,
+           specmode='cube', start=chanstart, width=chanwidth, nchan=nchan_out,
+           outframe='LSRK', veltype='radio', restfreq=str(nu_rest/1e9)+'GHz',
+           imsize=imsize, cell=cell, deconvolver='multiscale', scales=scales, 
+           gain=gain, niter=0, nterms=1, interactive=False, weighting='briggs', 
+           robust=robust, uvtaper=uvtaper, restoringbeam='common')
+
+    # make a Keplerian mask
+    make_mask(dataname+subname+'.image', inc=mask_pars[0], PA=mask_pars[1]+180,
+              mstar=mask_pars[2], dist=mask_pars[3], vlsr=mask_pars[4], 
+              r_max=1.2*mask_pars[5]/mask_pars[3], zr=mask_pars[6]/10, 
+              nbeams=1.5)
+           
+
+
+
 
     # make a Keplerian mask from the dirty image
     os.system('rm -rf data/images/'+fname+'_dirty.mask.image')

@@ -17,7 +17,7 @@ def csalt_vismodel(dataset, theta, theta_fixed, return_holders=False):
     mid_stamp = dataset.nu_LSRK.shape[0] / 2
     if (mid_stamp % 1) != 0:
         ilo = np.int(mid_stamp + mid_stamp % 1)
-        nu_midpt = np.average(dataset.nu_LSRK[ilo-1:ilo+1,:])
+        nu_midpt = np.mean(dataset.nu_LSRK[ilo-1:ilo+1,:], axis=0)
     else:
         nu_midpt = dataset.nu_LSRK[np.int(mid_stamp),:]
     v_model = const.c_ * (1 - nu_midpt / restfreq)

@@ -55,7 +55,7 @@ for i in range(nEB):
     # Get data, timestamps
     tb.open(dataname+'_tmp'+str(i)+'.ms')
     data_all = np.squeeze(tb.getcol('DATA'))
-    u, v = tb.getcol('UVW')[0,:], tb.getcol('UVW')[1,:]
+    um, vm = tb.getcol('UVW')[0,:], tb.getcol('UVW')[1,:]
     weights = tb.getcol('WEIGHT')
     tstamps = np.unique(tb.getcol('TIME'))
     tb.close()
@@ -64,6 +64,10 @@ for i in range(nEB):
     tb.open(dataname+'_tmp'+str(i)+'.ms/SPECTRAL_WINDOW')
     nu_TOPO_all = np.squeeze(tb.getcol('CHAN_FREQ'))
     tb.close()
+
+    # Convert spatial frequencies into wavelength units
+    u = um * np.mean(nu_TOPO_all) / c_
+    v = vm * np.mean(nu_TOPO_all) / c_
 
     # Calculate LSRK frequencies for each timestamp
     nu_LSRK_all = np.empty((len(tstamps), len(nu_TOPO_all)))

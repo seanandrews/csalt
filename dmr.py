@@ -34,8 +34,7 @@ data_dict = np.load(inp.dataname+'.npy', allow_pickle=True).item()
 
 # calculate
 for i in range(data_dict['nobs']):
-
-    print(i)
+    print('EB'+str(i))
 
     # load dataset
     d_ = np.load(inp.dataname+'_EB'+str(i)+'.npz')
@@ -46,6 +45,7 @@ for i in range(data_dict['nobs']):
     modelvis = csalt_vismodel(dataset, theta, theta_fixed)
 
     # pack dataset and model back into file
+    os.system('rm -rf '+inp.dataname+'_EB'+str(i)+'.npz')
     np.savez_compressed(inp.dataname+'_EB'+str(i), u=d_['u'], v=d_['v'], 
                         data=d_['data'], weights=d_['weights'], 
                         nu_TOPO=d_['nu_TOPO'], nu_LSRK=d_['nu_LSRK'],

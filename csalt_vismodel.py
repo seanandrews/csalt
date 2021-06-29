@@ -4,13 +4,14 @@ from cube_parser import cube_parser
 from vis_sample import vis_sample
 from scipy.ndimage import convolve1d
 import const as const
+import matplotlib.pyplot as plt
 
 
 def csalt_vismodel(dataset, theta, theta_fixed, return_holders=False):
 
     # parse the parameters
     ntheta = len(theta)
-    restfreq, FOV, Npix, dist, rmax = theta_fixed
+    restfreq, FOV, Npix, dist, r0 = theta_fixed
 
     # parse the velocities: in this case, use the LSRK velocities at the 
     # midpoint of the execution block
@@ -24,8 +25,7 @@ def csalt_vismodel(dataset, theta, theta_fixed, return_holders=False):
 
     # generate a model cube
     mcube = cube_parser(theta[:ntheta-3], FOV=FOV, Npix=Npix, dist=dist, 
-                        r_max=rmax, Vsys=theta[10], restfreq=restfreq,
-                        vel=v_model)
+                        r0=r0, Vsys=theta[10], restfreq=restfreq, vel=v_model)
 
     # sample the FT of the cube onto the observed spatial frequencies
     if return_holders:
@@ -59,12 +59,11 @@ def csalt_vismodel_iter(dataset, theta, theta_fixed, v_model, gcf, corr):
 
     # parse the parameters
     ntheta = len(theta)
-    restfreq, FOV, Npix, dist, rmax = theta_fixed
+    restfreq, FOV, Npix, dist, r0 = theta_fixed
 
     # generate a model cube
     mcube = cube_parser(theta[:ntheta-3], FOV=FOV, Npix=Npix, dist=dist,
-                        r_max=rmax, Vsys=theta[10], restfreq=restfreq,
-                        vel=v_model)
+                        r0=r0, Vsys=theta[10], restfreq=restfreq, vel=v_model)
 
     # sample the FT of the cube onto the observed spatial frequencies
     mvis = vis_sample(imagefile=mcube, mu_RA=theta[11], mu_DEC=theta[12], 

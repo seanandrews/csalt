@@ -20,7 +20,7 @@ def generate_kepmask(MSname, imgname):
            robust=robust, uvtaper=uvtaper, restoringbeam='common')
 
     # make a Keplerian mask
-    make_mask(imgname+'_dirty.image', inc=incl, PA=PA, dx0=xoff, dy0=yoff,
+    make_mask(imgname+'_dirty.image', inc=incl, PA=PA+180, dx0=xoff, dy0=yoff,
               mstar=mstar, dist=dist, vlsr=vsys, zr=z0 / r0, 
               r_max=1.2 * r_l / dist, nbeams=1.5)
 
@@ -44,6 +44,7 @@ def clean_cube(MSname, imgname, maskname=None):
 
     # make a clean image cube
     tclean(vis=MSname+'.ms', imagename=imgname, specmode='cube',
+           datacolumn='data',
            start=chanstart, width=chanwidth, nchan=nchan_out,
            outframe='LSRK', veltype='radio', restfreq=str(nu_rest/1e9)+'GHz',  
            imsize=imsize, cell=cell, deconvolver='multiscale', scales=scales, 

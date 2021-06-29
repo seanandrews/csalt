@@ -6,7 +6,8 @@ execfile('CASA_scripts/image_cube.py')
 
 # load the metadata
 data_dict = np.load(dataname+'.npy', allow_pickle=True).item()
-nobs = data_dict['nobs']
+#nobs = data_dict['nobs']
+nobs = 2
 
 
 # loop through each EB to create / regrid MS files
@@ -74,7 +75,7 @@ concat(vis=mfiles, concatvis=dataname+'_MOD_regrid.ms', dirtol='0.1arcsec',
 
 rfiles = [dataname+'_RES_regrid'+str(i)+'.ms' for i in range(nobs)]
 os.system('rm -rf '+dataname+'_RES_regrid.ms*')
-concat(vis=mfiles, concatvis=dataname+'_RES_regrid.ms', dirtol='0.1arcsec',
+concat(vis=rfiles, concatvis=dataname+'_RES_regrid.ms', dirtol='0.1arcsec',
        copypointing=False)
 
 

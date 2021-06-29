@@ -19,7 +19,7 @@ import const as const
 def cube_parser(pars, FOV=8, Npix=128, dist=150, r_min=0, r_max=500, r0=10,
                 RA=240, DEC=-40, restfreq=230.538e9, Vsys=0, vel=None,
                 datafile=None, outfile=None):
-                
+
     ### Generate a model disk
     disk = simple_disk(pars[0], pars[1], x0=0, y0=0, dist=dist, mstar=pars[2], 
                        r_min=r_min, r_max=r_max, r0=r0, r_l=pars[3],
@@ -40,6 +40,8 @@ def cube_parser(pars, FOV=8, Npix=128, dist=150, r_min=0, r_max=500, r0=10,
     else:
         freqs = restfreq * (1 - vel / const.c_)     
 
+
+
     # adjust for systemic velocity
     vlsr = vel - Vsys
 
@@ -50,7 +52,8 @@ def cube_parser(pars, FOV=8, Npix=128, dist=150, r_min=0, r_max=500, r0=10,
     # convert from brightness temperatures to Jy / pixel
     pixel_area = (disk.cell_sky * np.pi / (180 * 3600))**2
     for i in range(len(freqs)):
-        cube[i,:,:] *= 1e26 * pixel_area * 2 * freqs[i]**2 * const.k_ / const.c_**2
+        cube[i,:,:] *= 1e26 * pixel_area * 2 * freqs[i]**2 * \
+                       const.k_ / const.c_**2
 
 
     ### Prepare the output: either into the specified .FITS file or into a 

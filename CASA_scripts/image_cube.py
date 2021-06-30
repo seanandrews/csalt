@@ -1,15 +1,10 @@
 import os, sys
 import numpy as np
 execfile('/home/sandrews/mypy/keplerian_mask/keplerian_mask.py')
-execfile('fconfig.py')
 
+def generate_kepmask(setupname, MSname, imgname):
 
-def generate_kepmask(MSname, imgname):
-
-    # remove lingering files from previous runs
-    ext = ['.image', '.mask', '.model', '.pb', '.psf', '.residual', '.sumwt']
-    for j in ext:
-        os.system('rm -rf '+imgname+'_dirty'+j)
+    execfile('fconfig_'+setupname+'.py')
 
     # make a dirty image cube to guide the mask
     tclean(vis=MSname+'.ms', imagename=imgname+'_dirty', specmode='cube', 
@@ -24,13 +19,22 @@ def generate_kepmask(MSname, imgname):
               mstar=mstar, dist=dist, vlsr=vsys, zr=z0 / r0, 
               r_max=1.2 * r_l / dist, nbeams=1.5)
 
+    # cleanup
+    os.system('rm -rf '+dataname+'.mask')
+    os.system('mv '+imgname+'_dirty.mask.image '+dataname+'.mask')
+
+    ext = ['.image', '.mask', '.model', '.pb', '.psf', '.residual', '.sumwt']
+    [os.system('rm -rf '+imgname+'_dirty'+j) for j in ext]
+    
     os.system('rm -rf *.last')
 
-    return 0
+    return
 
 
 
-def clean_cube(MSname, imgname, maskname=None):
+def clean_cube(setupname, MSname, imgname, maskname=None):
+
+    execfile('fconfig_'+setupname+'.py')
 
     # if necessary, make a mask
     if maskname is None:
@@ -43,8 +47,7 @@ def clean_cube(MSname, imgname, maskname=None):
         os.system('rm -rf '+imgname+j)
 
     # make a clean image cube
-    tclean(vis=MSname+'.ms', imagename=imgname, specmode='cube',
-           datacolumn='data',
+    tclean(vis=MSname, imagename=imgname, specmode='cube', datacolumn='data',
            start=chanstart, width=chanwidth, nchan=nchan_out,
            outframe='LSRK', veltype='radio', restfreq=str(nu_rest/1e9)+'GHz',  
            imsize=imsize, cell=cell, deconvolver='multiscale', scales=scales, 
@@ -54,4 +57,4 @@ def clean_cube(MSname, imgname, maskname=None):
 
     os.system('rm -rf *.last')
 
-    return 0
+    return

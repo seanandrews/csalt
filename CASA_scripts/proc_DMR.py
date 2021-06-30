@@ -1,100 +1,44 @@
 import os, sys
 import numpy as np
-execfile('fconfig.py')
+execfile('fconfig_'+sys.argv[-1]+'.py')
 execfile('CASA_scripts/image_cube.py')
 
 
 # load the metadata
 data_dict = np.load(dataname+'.npy', allow_pickle=True).item()
-#nobs = data_dict['nobs']
-nobs = 2
+nobs = data_dict['nobs']
 
 
-# loop through each EB to create / regrid MS files
-for i in range(nobs):
+# process the model and residual MS
+for filetype in ['MOD', 'RES']:
 
-    # Regrid data if necessary
-    if np.logical_or(~os.path.exists(dataname+'_DAT_regrid'+str(i)+'.ms'),
-                     proc_D):
-        os.system('rm -rf '+dataname+'_DAT_regrid'+str(i)+'.ms*')
-        mstransform(vis=dataname+'_EB'+str(i)+'.ms', 
-                    outputvis=dataname+'_DAT_regrid'+str(i)+'.ms',
-                    keepflags=False, regridms=True, datacolumn='data', 
-                    mode='velocity', outframe='LSRK', veltype='radio',
-                    start=chanstart, width=chanwidth, nchan=nchan_out,
-                    restfreq=str(nu_rest/1e9)+'GHz')
-
-    # Create model and residual MS files
-    os.system('rm -rf '+dataname+'_EB'+str(i)+'.MOD.ms*')
-    os.system('cp -r '+dataname+'_EB'+str(i)+'.ms ' + \
-               dataname+'_EB'+str(i)+'.MOD.ms')
-    tb.open(dataname+'_EB'+str(i)+'.MOD.ms', nomodify=False)
-    tb.putcol("DATA", np.load(dataname+'_EB'+str(i)+'.npz')['model'])
-    tb.close()
-
-    os.system('rm -rf '+dataname+'_EB'+str(i)+'.RES.ms*')
-    os.system('cp -r '+dataname+'_EB'+str(i)+'.ms ' + \
-               dataname+'_EB'+str(i)+'.RES.ms')
-    tb.open(dataname+'_EB'+str(i)+'.RES.ms', nomodify=False)
-    data = tb.getcol("DATA")
-    tb.putcol("DATA", data - np.load(dataname+'_EB'+str(i)+'.npz')['model'])
-    tb.close()
- 
-    # Regrid model and residuals
-    os.system('rm -rf '+dataname+'_MOD_regrid'+str(i)+'.ms*')
-    mstransform(vis=dataname+'_EB'+str(i)+'.MOD.ms',
-                outputvis=dataname+'_MOD_regrid'+str(i)+'.ms',
-                keepflags=False, regridms=True, datacolumn='data',
-                mode='velocity', outframe='LSRK', veltype='radio',
-                start=chanstart, width=chanwidth, nchan=nchan_out,
-                restfreq=str(nu_rest/1e9)+'GHz')
-
-    os.system('rm -rf '+dataname+'_RES_regrid'+str(i)+'.ms*')
-    mstransform(vis=dataname+'_EB'+str(i)+'.RES.ms',
-                outputvis=dataname+'_RES_regrid'+str(i)+'.ms',
-                keepflags=False, regridms=True, datacolumn='data',
-                mode='velocity', outframe='LSRK', veltype='radio',
-                start=chanstart, width=chanwidth, nchan=nchan_out,
-                restfreq=str(nu_rest/1e9)+'GHz')
+    # loop through to create (if necessary) and regrid MS files for each EB
+    for i in range(nobs):
+        os.system('rm -rf '+dataname+'_EB'+str(i)+'.'+filetype+'.ms*')
+        os.system('cp -r '+dataname+'_EB'+str(i)+'.DAT.ms '+\
+                           dataname+'_EB'+str(i)+'.'+filetype+'.ms')
+        model_vis = np.load(dataname+'_EB'+str(i)+'.npz')['model']
+        tb.open(dataname+'_EB'+str(i)+'.'+filetype+'.ms', nomodify=False)
+        if filetype == 'MOD':
+            tb.putcol("DATA", model_vis)
+        else:
+            data_vis = tb.getcol("DATA")
+            tb.putcol("DATA", data_vis - model_vis)
+        tb.close()
 
 
+# Make a (Keplerian) mask if requested (or it doesn't already exist)
+if np.logical_or(gen_msk, ~os.path.exists(dataname+'.mask')):
+    generate_kepmask(sys.argv[-1], dataname+'_EB0.DAT', dataname+'.DAT')
 
 
+# Image the cubes if requested
+filetype = ['DAT', 'MOD', 'RES']
+for i in range(len(filetype)):
+    if gen_img[i]:
+        files_ = [dataname+'_EB'+str(j)+'.'+filetype[i]+'.ms' 
+                  for j in range(nobs)]
+        clean_cube(sys.argv[-1], files_, dataname+'.'+filetype[i], 
+                   maskname=dataname+'.mask')
 
-# Concatenate the regridded EBs (if necessary)
-if np.logical_or(~os.path.exists(dataname+'_DAT_regrid.ms'), proc_D):
-    dfiles = [dataname+'_DAT_regrid'+str(i)+'.ms' for i in range(nobs)]
-    os.system('rm -rf '+dataname+'_DAT_regrid.ms*')
-    concat(vis=dfiles, concatvis=dataname+'_DAT_regrid.ms', dirtol='0.1arcsec',
-           copypointing=False)
-
-mfiles = [dataname+'_MOD_regrid'+str(i)+'.ms' for i in range(nobs)]
-os.system('rm -rf '+dataname+'_MOD_regrid.ms*')
-concat(vis=mfiles, concatvis=dataname+'_MOD_regrid.ms', dirtol='0.1arcsec',
-       copypointing=False)
-
-rfiles = [dataname+'_RES_regrid'+str(i)+'.ms' for i in range(nobs)]
-os.system('rm -rf '+dataname+'_RES_regrid.ms*')
-concat(vis=rfiles, concatvis=dataname+'_RES_regrid.ms', dirtol='0.1arcsec',
-       copypointing=False)
-
-
-
-# Image the cubes (if necessary)
-generate_kepmask(dataname+'_DAT_regrid', dataname+'_DAT')
-
-os.system('rm -rf '+dataname+'.mask')
-os.system('mv '+dataname+'_DAT_dirty.mask.image '+dataname+'.mask')
-
-if do_img[0]:
-    clean_cube(dataname+'_DAT_regrid', dataname+'_DAT', 
-               maskname=dataname+'.mask')
-
-if do_img[1]:
-    clean_cube(dataname+'_MOD_regrid', dataname+'_MOD', 
-               maskname=dataname+'.mask')
-
-if do_img[2]:
-    clean_cube(dataname+'_RES_regrid', dataname+'_RES', 
-               maskname=dataname+'.mask')
-
+os.system('rm -rf *.last')

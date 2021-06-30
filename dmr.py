@@ -1,9 +1,10 @@
-import os, sys, time
+import os, sys, time, importlib
 import numpy as np
 import const as const
 from csalt_vismodel import *
 
 
+# a data class for easier packaging
 class vdata:
    def __init__(self, u, v, vis, wgt, nu_topo, nu_lsrk):
         self.u = u
@@ -14,14 +15,8 @@ class vdata:
         self.nu_LSRK = nu_lsrk
 
 
-# set target name
-targ_name = 'Sz129'
-
-
-
 # load inputs
-os.system('cp fconfig_'+targ_name+'.py fconfig.py')
-import fconfig as inp
+inp = importlib.import_module('fconfig_'+sys.argv[-1])
 
 # set parameters
 theta = np.array([inp.incl, inp.PA, inp.mstar, inp.r_l, inp.z0, inp.psi, 
@@ -53,9 +48,6 @@ for i in range(data_dict['nobs']):
 
 
 # convert the model and residual visibilities into MS format
-clog = 'CASA_logs/proc_DMR_'+targ_name+'.log'
-os.system('casa --nologger --logfile '+clog+' -c CASA_scripts/proc_DMR.py')
-
-# image the concatenated data products
-
-
+os.system('rm -rf CASA_logs/proc_DMR_'+sys.argv[-1]+'.log')
+os.system('casa --nologger --logfile CASA_logs/proc_DMR_'+sys.argv[-1]+\
+          '.log -c CASA_scripts/proc_DMR.py '+sys.argv[-1])

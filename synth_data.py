@@ -1,14 +1,16 @@
 """
 Generate a synthetic ALMA dataset.
 """
-import os, sys, time
+import os, sys, time, importlib
 import numpy as np
-from scipy.interpolate import interp1d
 from scipy.ndimage import convolve1d
 from vis_sample import vis_sample
 import const as const
-import synth_config as inp
 from cube_parser import cube_parser
+
+
+# load synthetic data inputs
+inp = importlib.import_module('sconfig_'+sys.argv[-1])
 
 
 # Set up the workspace if necessary
@@ -18,8 +20,9 @@ if not os.path.exists('obs_templates'):
 elif not os.path.exists('obs_templates/sims'):
     os.system('mkdir obs_templates/sims')
 
-if not os.path.exists('storage'):
-    os.system('mkdir storage')
+if inp.stordir[-1] != '/': inp.stordir += '/'
+if not os.path.exists(inp.stordir):
+    os.system('mkdir '+inp.stordir)
 
 
 
@@ -65,7 +68,9 @@ if gen_template:
     f.close()
 
     # Generate the (u,v) tracks and spectra on starting integration LSRK frame
-    os.system('casa --nologger --nologfile -c CASA_scripts/mock_obs.py')
+    os.system('rm -rf CASA_logs/mock_obs_'+sys.argv[-1]+'.log')
+    os.system('casa --nologger --logfile CASA_logs/mock_obs_'+sys.argv[-1]+\
+              '.log -c CASA_scripts/mock_obs.py '+sys.argv[-1])
 
 
 
@@ -99,8 +104,8 @@ nstamps = t_nu_LSRK.shape[0]
 # This is easy to change, but it increases the FT computation time by a 
 # factor of roughly the number of timestamps (since there's that many more 
 # unique (u,v) points to calculate.
-uu = t_u * np.mean(t_nu_LSRK) / const.c_
-vv = t_v * np.mean(t_nu_LSRK) / const.c_
+uu = t_u * np.mean(t_nu_TOPO) / const.c_
+vv = t_v * np.mean(t_nu_TOPO) / const.c_
 
 
 # Upsample spectral domain (for careful windowing)
@@ -137,9 +142,9 @@ sigma_noise = sigma_out * np.sqrt(np.pi * inp.spec_over)
 noise = np.squeeze(np.random.normal(0, sigma_noise, (npol, nch_up, nvis, 2)))
 
 
-### Compute noisy and uncorrupted ("clean") visibilities at each timestamp
+### Compute noisy and uncorrupted ("pure") visibilities at each timestamp
 ### (I think I can make this a bit more efficient, but...)
-clean_vis = np.squeeze(np.empty((npol, nch_up, nvis, 2)))
+pure_vis  = np.squeeze(np.empty((npol, nch_up, nvis, 2)))
 noisy_vis = np.squeeze(np.empty((npol, nch_up, nvis, 2)))
 nperstamp = np.int(nvis / nstamps)
 for i in range(nstamps):
@@ -151,20 +156,23 @@ for i in range(nstamps):
                        dist=inp.dist, r_max=inp.rmax, Vsys=inp.pars[10], 
                        vel=v_LSRK[i,:], restfreq=inp.restfreq)
 
+    # indices for this timestamp only
+    ixl, ixh = i * nperstamp, (i + 1) * nperstamp
+
     # sample it's Fourier transform on the template (u,v) spacings
-    mvis = vis_sample(imagefile=cube, uu=uu, vv=vv, mu_RA=inp.pars[11], 
-                      mu_DEC=inp.pars[12], mod_interp=False).T
+    mvis = vis_sample(imagefile=cube, uu=uu[ixl:ixh], vv=vv[ixl:ixh], 
+                      mu_RA=inp.pars[11], mu_DEC=inp.pars[12], 
+                      mod_interp=False).T
 
     # populate the results in the output array *for this timestamp only*
-    ixl, ixh = i * nperstamp, (i + 1) * nperstamp
-    clean_vis[0,:,ixl:ixh,0] = mvis.real[:,ixl:ixh]
-    clean_vis[1,:,ixl:ixh,0] = mvis.real[:,ixl:ixh]
-    clean_vis[0,:,ixl:ixh,1] = mvis.imag[:,ixl:ixh]
-    clean_vis[1,:,ixl:ixh,1] = mvis.imag[:,ixl:ixh]
-    noisy_vis[0,:,ixl:ixh,0] = mvis.real[:,ixl:ixh] + noise[0,:,ixl:ixh,0]
-    noisy_vis[1,:,ixl:ixh,0] = mvis.real[:,ixl:ixh] + noise[1,:,ixl:ixh,0]
-    noisy_vis[0,:,ixl:ixh,1] = mvis.imag[:,ixl:ixh] + noise[0,:,ixl:ixh,1]
-    noisy_vis[1,:,ixl:ixh,1] = mvis.imag[:,ixl:ixh] + noise[1,:,ixl:ixh,1]
+    pure_vis[0,:,ixl:ixh,0] = mvis.real
+    pure_vis[1,:,ixl:ixh,0] = mvis.real
+    pure_vis[0,:,ixl:ixh,1] = mvis.imag
+    pure_vis[1,:,ixl:ixh,1] = mvis.imag
+    noisy_vis[0,:,ixl:ixh,0] = mvis.real + noise[0,:,ixl:ixh,0]
+    noisy_vis[1,:,ixl:ixh,0] = mvis.real + noise[1,:,ixl:ixh,0]
+    noisy_vis[0,:,ixl:ixh,1] = mvis.imag + noise[0,:,ixl:ixh,1]
+    noisy_vis[1,:,ixl:ixh,1] = mvis.imag + noise[1,:,ixl:ixh,1]
 
 
 
@@ -173,11 +181,11 @@ for i in range(nstamps):
 chix = np.arange(nch_up) / inp.spec_over
 xch = chix - np.mean(chix)
 SRF = 0.5 * np.sinc(xch) + 0.25 * np.sinc(xch - 1) + 0.25 * np.sinc(xch + 1)
-clean_vis = convolve1d(clean_vis, SRF/np.sum(SRF), axis=1, mode='nearest')
+pure_vis = convolve1d(pure_vis, SRF/np.sum(SRF), axis=1, mode='nearest')
 noisy_vis = convolve1d(noisy_vis, SRF/np.sum(SRF), axis=1, mode='nearest')
 
 # decimate by the over-sampling factor
-clean_vis = clean_vis[:,::inp.spec_over,:,:]
+pure_vis = pure_vis[:,::inp.spec_over,:,:]
 noisy_vis = noisy_vis[:,::inp.spec_over,:,:]
 nu_LSRK = nu_LSRK[:,::inp.spec_over]
 vel_LSRK = v_LSRK[:,::inp.spec_over]
@@ -188,17 +196,18 @@ weights_out = np.sqrt(1 / sigma_out) * np.ones((npol, nvis))
 
 
 ### Package data (both in .npz and .ms formats)
-if not os.path.exists('storage/'+inp.basename):
-    os.system('mkdir storage/'+inp.basename)
+if not os.path.exists(inp.stordir+inp.basename):
+    os.system('mkdir '+inp.stordir+inp.basename)
 
-os.system('cp synth_config.py storage/'+inp.basename+'/synth_config_'+\
-          inp.basename+'-'+inp.template+'.py')
-os.system('rm -rf storage/'+inp.basename+'/'+inp.basename+'-'+\
+os.system('cp sconfig_'+sys.argv[-1]+'.py '+inp.stordir+inp.basename)
+os.system('rm -rf '+inp.stordir+inp.basename+'/'+inp.basename+'-'+\
           inp.template+'.npz')
-np.savez('storage/'+inp.basename+'/'+inp.basename+'-'+inp.template+'.npz', 
+np.savez(inp.stordir+inp.basename+'/'+inp.basename+'-'+inp.template+'.npz', 
          u=uu, v=vv, weights=weights_out, 
          freq_LSRK_grid=nu_LSRK, vel_LSRK_grid=vel_LSRK,
-         vis=clean_vis[:,:,:,0] + 1j*clean_vis[:,:,:,1],
-         vis_noisy= noisy_vis[:,:,:,0] + 1j*noisy_vis[:,:,:,1])
+         vis_pure=pure_vis[:,:,:,0] + 1j*pure_vis[:,:,:,1],
+         vis=noisy_vis[:,:,:,0] + 1j*noisy_vis[:,:,:,1])
 
-os.system('casa --nologger --nologfile -c CASA_scripts/pack_data.py')
+os.system('rm -rf CASA_logs/pack_data_'+sys.argv[-1]+'.log')
+os.system('casa --nologger --logfile CASA_logs/pack_data_'+sys.argv[-1]+\
+          '.log -c CASA_scripts/pack_data.py '+sys.argv[-1])

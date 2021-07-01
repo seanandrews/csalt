@@ -1,33 +1,33 @@
-import os
+import os, sys
 import numpy as np
-execfile('synth_config.py')
+execfile('sconfig_'+sys.argv[-1]+'.py')
 execfile('const.py')
 
 """
 Load the synthetic visibility data.
 """
 # load the synthetic visibility spectra
-dat = np.load('storage/'+basename+'/'+basename+'-'+template+'.npz')
-ivis, ivis_noisy, iwgt = dat['vis'], dat['vis_noisy'], dat['weights']
+if stordir[-1] != '/': stordir += '/'
+dat = np.load(stordir+basename+'/'+basename+'-'+template+'.npz')
+ivis, ivis_pure, iwgt = dat['vis'], dat['vis_pure'], dat['weights']
 
 
-# open the "clean" (uncorrupted) MS table and substitute in the synthetic data
-os.system('rm -rf storage/'+basename+'/'+basename+'-'+template+'.ms')
+# open the "pure" (uncorrupted) MS table and substitute in the synthetic data
+os.system('rm -rf '+stordir+basename+'/'+basename+'-'+template+'.pure.ms')
 os.system('cp -r obs_templates/'+template+'.ms '+ \
-          'storage/'+basename+'/'+basename+'-'+template+'.ms')
-tb.open('storage/'+basename+'/'+basename+'-'+template+'.ms', nomodify=False)
-tb.putcol("DATA", ivis)
+          stordir+basename+'/'+basename+'-'+template+'.pure.ms')
+tb.open(stordir+basename+'/'+basename+'-'+template+'.pure.ms', nomodify=False)
+tb.putcol("DATA", ivis_pure)
 tb.putcol("WEIGHT", iwgt)
 tb.flush()
 tb.close()
 
 # open the "noisy" (corrupted) MS table and substitute in the synthetic data
-os.system('rm -rf storage/'+basename+'/'+basename+'-'+template+'_noisy.ms')
+os.system('rm -rf '+stordir+basename+'/'+basename+'-'+template+'.noisy.ms')
 os.system('cp -r obs_templates/'+template+'.ms '+ \
-          'storage/'+basename+'/'+basename+'-'+template+'_noisy.ms')
-tb.open('storage/'+basename+'/'+basename+'-'+template+'_noisy.ms', 
-        nomodify=False)
-tb.putcol("DATA", ivis_noisy)
+          stordir+basename+'/'+basename+'-'+template+'.noisy.ms')
+tb.open(stordir+basename+'/'+basename+'-'+template+'.noisy.ms', nomodify=False)
+tb.putcol("DATA", ivis)
 tb.putcol("WEIGHT", iwgt)
 tb.flush()
 tb.close()

@@ -2,9 +2,9 @@
 Generate a template MS and associated information file for use in a synthetic
 data product.
 """
-import os
+import os, sys
 import numpy as np
-execfile('synth_config.py')
+execfile('sconfig_'+sys.argv[-1]+'.py')
 execfile('const.py')
 
 
@@ -30,8 +30,7 @@ ia.done()
 os.chdir('sims')
 
 # Run the simulation
-simobserve(project=template+'.sim', #skymodel='../'+template+'.fits', 
-           skymodel='../dummy.image',
+simobserve(project=template+'.sim', skymodel='../dummy.image',
            antennalist=simobs_dir+'alma.cycle7.'+config+'.cfg',
            totaltime=ttotal, integration=integ, thermalnoise='', 
            indirection='J2000 '+RA+' '+DEC, incell='0.02arcsec',

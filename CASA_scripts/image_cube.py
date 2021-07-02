@@ -16,7 +16,7 @@ def generate_kepmask(setupname, MSname, imgname):
 
     # make a Keplerian mask
     make_mask(imgname+'_dirty.image', inc=incl, PA=PA+180, dx0=xoff, dy0=yoff,
-              mstar=mstar, dist=dist, vlsr=vsys, zr=z0 / r0, 
+              mstar=mstar, dist=dist, vlsr=vsys, zr=z0 / 10, 
               r_max=1.2 * r_l / dist, nbeams=1.5)
 
     # cleanup

@@ -23,7 +23,7 @@ def lnprob(data, theta, theta_fixed, method='quick'):
                           mu_RA=theta[11], mu_DEC=theta[12], mod_interp=False).T
 
 
-    if method == 'interp':
+    if method == 'interp-cubic':
         mcube = cube_parser(theta[:ntheta-3], FOV=FOV, Npix=Npix, dist=dist,
                             r_max=rmax, Vsys=theta[10], restfreq=restfreq,
                             vel=data.vmod)
@@ -41,6 +41,41 @@ def lnprob(data, theta, theta_fixed, method='quick'):
                             kind='cubic', fill_value='extrapolate')
             mvis[:,ix_lo:ix_hi] = fint(data.vmod_grid[i,:])
 
+    if method == 'interp-quad':
+        mcube = cube_parser(theta[:ntheta-3], FOV=FOV, Npix=Npix, dist=dist,
+                            r_max=rmax, Vsys=theta[10], restfreq=restfreq,
+                            vel=data.vmod)
+
+        mvisi = vis_sample(imagefile=mcube, uu=data.u, vv=data.v,
+                           mu_RA=theta[11], mu_DEC=theta[12],
+                           mod_interp=False).T
+
+        nstamps = data.vmod_grid.shape[0]
+        nperstamp = np.int(data.vis.shape[-1] / nstamps)
+        mvis = np.empty_like(mvisi)
+        for i in range(nstamps):
+            ix_lo, ix_hi = i * nperstamp, (i + 1) * nperstamp
+            fint = interp1d(data.vmod, mvisi[:,ix_lo:ix_hi], axis=0,
+                            kind='quadratic', fill_value='extrapolate')
+            mvis[:,ix_lo:ix_hi] = fint(data.vmod_grid[i,:])
+
+    if method == 'interp-linear':
+        mcube = cube_parser(theta[:ntheta-3], FOV=FOV, Npix=Npix, dist=dist,
+                            r_max=rmax, Vsys=theta[10], restfreq=restfreq,
+                            vel=data.vmod)
+    
+        mvisi = vis_sample(imagefile=mcube, uu=data.u, vv=data.v,
+                           mu_RA=theta[11], mu_DEC=theta[12],
+                           mod_interp=False).T
+            
+        nstamps = data.vmod_grid.shape[0]
+        nperstamp = np.int(data.vis.shape[-1] / nstamps)
+        mvis = np.empty_like(mvisi)
+        for i in range(nstamps):
+            ix_lo, ix_hi = i * nperstamp, (i + 1) * nperstamp
+            fint = interp1d(data.vmod, mvisi[:,ix_lo:ix_hi], axis=0,
+                            kind='linear', fill_value='extrapolate')
+            mvis[:,ix_lo:ix_hi] = fint(data.vmod_grid[i,:])
 
     if method == 'full':
         nstamps = data.vmod_grid.shape[0]
@@ -82,7 +117,7 @@ def lnprob(data, theta, theta_fixed, method='quick'):
         resid = np.absolute(data.vis_bin[i,:,:] - mvis_bin)
         lnL -= 0.5*np.tensordot(resid, np.dot(Minv, data.wgt_bin[i,:,:]*resid))
 
-    return lnL #+ data.lnL0
+    return lnL, mvis #+ data.lnL0
 
 
 
@@ -104,13 +139,11 @@ theta = np.array([inp.incl, inp.PA, inp.mstar, inp.r_l, inp.z0, inp.psi,
 theta_fixed = inp.nu_rest, inp.FOV, inp.Npix, inp.dist, inp.rmax
 
 # calculate a log-likelihood
-t0 = time.time()
-chi2_quick = -2 * lnprob(data_EB0, theta, theta_fixed, method='quick')
-t1 = time.time()
-chi2_interp = -2 * lnprob(data_EB0, theta, theta_fixed, method='interp')
-t2 = time.time()
-#chi2_full = -2 * lnprob(data_EB0, theta, theta_fixed, method='full')
-t3 = time.time()
+lnL_quick, mvis_quick = lnprob(data_EB0, theta, theta_fixed, method='quick')
+lnL_lin, mvis_lin = lnprob(data_EB0, theta, theta_fixed, method='interp-linear')
+lnL_quad, mvis_quad = lnprob(data_EB0, theta, theta_fixed, method='interp-quad')
+lnL_cub, mvis_cub = lnprob(data_EB0, theta, theta_fixed, method='interp-cubic')
+lnL_full, mvis_full = lnprob(data_EB0, theta, theta_fixed, method='full')
 
-print(chi2_interp, chi2_quick)
-print(t2-t1, t1-t0)
+np.savez('lnl_tests.npz', mvis_quick=mvis_quick, mvis_lin=mvis_lin, 
+         mvis_quad=mvis_quad, mvis_cub=mvis_cub, mvis_full=mvis_full)

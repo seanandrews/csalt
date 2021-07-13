@@ -1,17 +1,27 @@
 """
-Generate a template MS and associated information file for use in a synthetic
-data product.
+    mock_obs.py
+
+    Usage: 
+        CASA> execfile('mock_obs.py <template_name>')
+
+    Settings are edited by the user in 'tconfig_<template_name>.py'.
+
+    Outputs:
+        - template_dir/sims/ directory containing CASA.simobserve outputs
+	- template_dir/<template_name>.ms containing (dummy) template MS
+	- template_dir/<template_name>.npz containing relevant MS data
 """
 import os, sys
 import numpy as np
-execfile('sconfig_'+sys.argv[-1]+'.py')
+execfile('tconfig_'+sys.argv[-1]+'.py')
 execfile('const.py')
 
 
 ### Simulation setups
-os.chdir('obs_templates')
+template = sys.argv[-1]
+os.chdir(template_dir)
 
-# Number of channels needed to span the desired velocity range
+# Number of native channels needed to span the desired velocity range
 nch = 2 * np.int(vspan / (c_ * dfreq0 / restfreq)) + 1
 
 # TOPO frequency corresponding to desired tuning velocity (center of SPW)
@@ -25,7 +35,6 @@ res = ia.fromarray(outfile='dummy.image', pixels=dummy, overwrite=True)
 ia.done()
 
 
-
 ### Simulate observations to generate the MS structure
 os.chdir('sims')
 
@@ -36,18 +45,16 @@ simobserve(project=template+'.sim', skymodel='../dummy.image',
            indirection='J2000 '+RA+' '+DEC, incell='0.02arcsec',
            incenter=str(nu_tune/1e9)+'GHz', inwidth=str(dfreq0 * 1e-3)+'kHz', 
            refdate=date, hourangle=HA, mapsize='10arcsec', outframe='TOPO')
-os.chdir('../')
+os.system('rm -rf *.last')
+os.chdir('..')
 
-# Store the simulated MS in obs_template
+# Move the simulated MS here
 os.system('rm -rf '+template+'.ms*')
 sim_MS = 'sims/'+template+'.sim/'+template+'.sim.alma.cycle7.'+config+'.ms'
 os.system('mv '+sim_MS+' '+template+'.ms')
 
 
-
 ### Extract the MS contents for easier access
-
-# Data structures and unique timestamps (s in UTC MJD) 
 tb.open(template+'.ms')
 data = np.squeeze(tb.getcol("DATA"))
 u, v = tb.getcol('UVW')[0,:], tb.getcol('UVW')[1,:]
@@ -65,13 +72,14 @@ nu_LSRK = np.empty((len(tstamps), len(nu_TOPO)))
 ms.open(template+'.ms')
 for j in range(len(tstamps)):
     nu_LSRK[j,:] = ms.cvelfreqs(mode='channel', outframe='LSRK',
-                                    obstime=str(tstamps[j])+'s')
+                                obstime=str(tstamps[j])+'s')
 ms.close()
 
 # Record the results
 np.savez(template+'.npz', data=data, u=u, v=v, weights=weights, 
                           nu_TOPO=nu_TOPO, nu_LSRK=nu_LSRK)
 
-os.chdir('../')
-
+# Clean up
+os.system('rm -rf dummy.image')
+os.chdir('..')
 os.system('rm -rf *.last')

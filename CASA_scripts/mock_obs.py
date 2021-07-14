@@ -55,12 +55,19 @@ os.system('mv '+sim_MS+' '+template+'.ms')
 
 
 ### Extract the MS contents for easier access
+# Access MS contents
 tb.open(template+'.ms')
 data = np.squeeze(tb.getcol("DATA"))
 u, v = tb.getcol('UVW')[0,:], tb.getcol('UVW')[1,:]
 weights = tb.getcol('WEIGHT')
-tstamps = np.unique(tb.getcol("TIME"))
+times = tb.getcol("TIME")
 tb.close()
+
+# Index the timestamps
+tstamps = np.unique(times)
+tstamp_ID = np.empty_like(times)
+for i in range(len(tstamps)):
+    tstamp_ID[times == tstamps[i]] = i
 
 # TOPO frequency channels (Hz)
 tb.open(template+'.ms/SPECTRAL_WINDOW')
@@ -76,8 +83,8 @@ for j in range(len(tstamps)):
 ms.close()
 
 # Record the results
-np.savez(template+'.npz', data=data, u=u, v=v, weights=weights, 
-                          nu_TOPO=nu_TOPO, nu_LSRK=nu_LSRK)
+np.savez_compressed(template+'.npz', data=data, um=u, vm=v, weights=weights, 
+                    tstamp_ID=tstamp_ID, nu_TOPO=nu_TOPO, nu_LSRK=nu_LSRK)
 
 # Clean up
 os.system('rm -rf dummy.image')

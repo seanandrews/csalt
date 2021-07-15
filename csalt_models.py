@@ -220,26 +220,22 @@ def vismodel_full(pars, fixed, dataset, oversample=None, noise_inject=None):
 
     # Return decimated visibilities, with noise if necessary
     if noise_inject is None:
+        # Decimate
         mvis_pure = mvis_pure[:,::oversample,:,:]
+
+        # Convert to complex and return
         return mvis_pure[:,:,:,0] + 1j * mvis_pure[:,:,:,1]
     else:
+        # SRF convolution of noisy data
         mvis_noisy = convolve1d(mvis_pure + noise, SRF/np.sum(SRF), 
                                 axis=1, mode='nearest')
+
+        # Decimate
+        mvis_pure = mvis_pure[:,::oversample,:,:]
         mvis_noisy = mvis_noisy[:,::oversample,:,:]
+
+        # Convert to complex
         mvis_pure = mvis_pure[:,:,:,0] + 1j * mvis_pure[:,:,:,1]
         mvis_noisy = mvis_noisy[:,:,:,0] + 1j * mvis_noisy[:,:,:,1]
+
         return mvis_pure, mvis_noisy
-
-
-
-
-
-
-
-
-
-
-
-
-
-

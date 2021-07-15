@@ -16,9 +16,6 @@ class dataset:
         # data visibilities, weights, and timestamp IDs
         self.vis = vis
         self.npol, self.nchan, self.nvis = vis.shape
-
-        if wgt.shape != vis.shape:
-            wgt = np.rollaxis(np.tile(wgt, (self.nchan, 1, 1)), 1)
         self.wgt = wgt
 
         self.tstamp = tstamp_ID

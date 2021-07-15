@@ -55,5 +55,9 @@ else:
               sys.argv[-1]+'.noisy.ms')
 
 
-# Cleanup
+# Cleanup 
+for i in range(len(pure_files)):
+    os.system('rm -rf '+pure_files[i])
+    os.system('rm -rf '+noisy_files[i])
+os.system('rm -rf '+storage_dir+basename+'/'+sys.argv[-1]+'_EB*npz')
 os.system('rm -rf *.last')

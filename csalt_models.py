@@ -15,6 +15,7 @@ from scipy.ndimage import convolve1d
 from vis_sample.classes import *
 from simple_disk import simple_disk
 import const as const
+import matplotlib.pyplot as plt
 
 
 def cube_parser(pars, FOV=8, Npix=128, dist=150, r_min=0, r_max=500, r0=10,
@@ -139,7 +140,8 @@ def cube_parser(pars, FOV=8, Npix=128, dist=150, r_min=0, r_max=500, r0=10,
 
 
 
-def vismodel_full(pars, fixed, dataset, oversample=None, noise_inject=None):
+def vismodel_full(pars, fixed, dataset, 
+                  chpad=3, oversample=None, noise_inject=None):
 
     ### - Prepare inputs
     # Parse fixed parameters
@@ -150,9 +152,25 @@ def vismodel_full(pars, fixed, dataset, oversample=None, noise_inject=None):
     uu = dataset.um * np.mean(dataset.nu_TOPO) / const.c_
     vv = dataset.vm * np.mean(dataset.nu_TOPO) / const.c_
 
+    # Pad the frequency arrays
+    dnu_TOPO = np.diff(dataset.nu_TOPO)[0]
+    nu_TOPO_s = dataset.nu_TOPO[0] + dnu_TOPO * np.arange(-chpad, 0, 1)
+    nu_TOPO_f = dataset.nu_TOPO[-1] + dnu_TOPO * np.arange(1, chpad+1, 1)
+    dataset.nu_TOPO = np.concatenate((nu_TOPO_s, dataset.nu_TOPO, nu_TOPO_f))
+    
+
+    dnu_LSRK = np.diff(dataset.nu_LSRK, axis=1)[:,0]
+    nu_LSRK_s = np.tile(dataset.nu_LSRK[:,0], (chpad, 1)).T + \
+                np.outer(dnu_LSRK, np.arange(-chpad, 0, 1))
+    nu_LSRK_f = np.tile(dataset.nu_LSRK[:,-1], (chpad, 1)).T + \
+                np.outer(dnu_LSRK, np.arange(1, chpad+1, 1))
+    dataset.nu_LSRK = np.concatenate((nu_LSRK_s, dataset.nu_LSRK, nu_LSRK_f),
+                                     axis=1)
+    
+
     # Upsample in the spectral domain (if necessary)
     if oversample is not None:
-        nchan = dataset.nchan
+        nchan = dataset.nchan + 2 * chpad
         nu_TOPO = np.interp(np.arange((nchan-1) * oversample + 1),
                             np.arange(0, nchan * oversample, oversample),
                             dataset.nu_TOPO)
@@ -212,6 +230,7 @@ def vismodel_full(pars, fixed, dataset, oversample=None, noise_inject=None):
         mvis_pure[0,:,ixl:ixh,1] = mvis.imag
         mvis_pure[1,:,ixl:ixh,1] = mvis.imag
 
+
     # Convolve with the spectral response function
     chix = np.arange(nch) / oversample
     xch = chix - np.mean(chix)
@@ -220,8 +239,9 @@ def vismodel_full(pars, fixed, dataset, oversample=None, noise_inject=None):
 
     # Return decimated visibilities, with noise if necessary
     if noise_inject is None:
-        # Decimate
+        # Decimate and remove padding
         mvis_pure = mvis_pure[:,::oversample,:,:]
+        mvis_pure = mvis_pure[:,chpad:-chpad,:,:]
 
         # Convert to complex and return
         return mvis_pure[:,:,:,0] + 1j * mvis_pure[:,:,:,1]
@@ -232,7 +252,9 @@ def vismodel_full(pars, fixed, dataset, oversample=None, noise_inject=None):
 
         # Decimate
         mvis_pure = mvis_pure[:,::oversample,:,:]
+        mvis_pure = mvis_pure[:,chpad:-chpad,:,:]
         mvis_noisy = mvis_noisy[:,::oversample,:,:]
+        mvis_noisy = mvis_noisy[:,chpad:-chpad,:,:]
 
         # Convert to complex
         mvis_pure = mvis_pure[:,:,:,0] + 1j * mvis_pure[:,:,:,1]
@@ -245,7 +267,8 @@ def vismodel_full(pars, fixed, dataset, oversample=None, noise_inject=None):
 
 
 
-def vismodel_def(pars, fixed, dataset, imethod='cubic', return_holders=False):
+def vismodel_def(pars, fixed, dataset, 
+                 imethod='cubic', return_holders=False, chpad=3):
 
     ### - Prepare inputs
     # Parse fixed parameters

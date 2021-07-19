@@ -57,6 +57,6 @@ for itmp in range(len(inp.template)):
 
 
 # Pack the data into a single, concatenated MS file (like real data)
-os.system('rm -rf CASA_logs/pack_synth_data_'+sys.argv[-1]+'.log')
-os.system('casa --nologger --logfile CASA_logs/pack_synth_data_'+sys.argv[-1]+\
-          '.log -c CASA_scripts/pack_synth_data.py '+sys.argv[-1])
+#os.system('rm -rf CASA_logs/pack_synth_data_'+sys.argv[-1]+'.log')
+#os.system('casa --nologger --logfile CASA_logs/pack_synth_data_'+sys.argv[-1]+\
+#          '.log -c CASA_scripts/pack_synth_data.py '+sys.argv[-1])

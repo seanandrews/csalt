@@ -157,16 +157,14 @@ def vismodel_full(pars, fixed, dataset,
     nu_TOPO_s = dataset.nu_TOPO[0] + dnu_TOPO * np.arange(-chpad, 0, 1)
     nu_TOPO_f = dataset.nu_TOPO[-1] + dnu_TOPO * np.arange(1, chpad+1, 1)
     dataset.nu_TOPO = np.concatenate((nu_TOPO_s, dataset.nu_TOPO, nu_TOPO_f))
-    
 
     dnu_LSRK = np.diff(dataset.nu_LSRK, axis=1)[:,0]
-    nu_LSRK_s = np.tile(dataset.nu_LSRK[:,0], (chpad, 1)).T + \
-                np.outer(dnu_LSRK, np.arange(-chpad, 0, 1))
-    nu_LSRK_f = np.tile(dataset.nu_LSRK[:,-1], (chpad, 1)).T + \
-                np.outer(dnu_LSRK, np.arange(1, chpad+1, 1))
+    nu_LSRK_s = (dataset.nu_LSRK[:,0])[:,None] + \
+                dnu_LSRK[:,None] * np.arange(-chpad, 0, 1)[None,:]
+    nu_LSRK_f = (dataset.nu_LSRK[:,-1])[:,None] + \
+                dnu_LSRK[:,None] * np.arange(1, chpad+1, 1)[None,:]
     dataset.nu_LSRK = np.concatenate((nu_LSRK_s, dataset.nu_LSRK, nu_LSRK_f),
                                      axis=1)
-    
 
     # Upsample in the spectral domain (if necessary)
     if oversample is not None:
@@ -279,6 +277,20 @@ def vismodel_def(pars, fixed, dataset,
     uu = dataset.um * np.mean(dataset.nu_TOPO) / const.c_
     vv = dataset.vm * np.mean(dataset.nu_TOPO) / const.c_
 
+    # Pad the frequency arrays
+    dnu_TOPO = np.diff(dataset.nu_TOPO)[0]
+    nu_TOPO_s = dataset.nu_TOPO[0] + dnu_TOPO * np.arange(-chpad, 0, 1)
+    nu_TOPO_f = dataset.nu_TOPO[-1] + dnu_TOPO * np.arange(1, chpad+1, 1)
+    dataset.nu_TOPO = np.concatenate((nu_TOPO_s, dataset.nu_TOPO, nu_TOPO_f))
+
+    dnu_LSRK = np.diff(dataset.nu_LSRK, axis=1)[:,0]
+    nu_LSRK_s = (dataset.nu_LSRK[:,0])[:,None] + \
+                dnu_LSRK[:,None] * np.arange(-chpad, 0, 1)[None,:]
+    nu_LSRK_f = (dataset.nu_LSRK[:,-1])[:,None] + \
+                dnu_LSRK[:,None] * np.arange(1, chpad+1, 1)[None,:]
+    dataset.nu_LSRK = np.concatenate((nu_LSRK_s, dataset.nu_LSRK, nu_LSRK_f),
+                                     axis=1)
+
     # LSRK velocities at midpoint of execution block
     mid_stamp = np.int(dataset.nu_LSRK.shape[0] / 2)
     v_model = const.c_ * (1 - dataset.nu_LSRK[mid_stamp,:] / restfreq)
@@ -307,6 +319,7 @@ def vismodel_def(pars, fixed, dataset,
     mvis_re = convolve1d(mvis.real, SRF_kernel, axis=0, mode='nearest')
     mvis_im = convolve1d(mvis.imag, SRF_kernel, axis=0, mode='nearest')
     mvis = mvis_re + 1.0j*mvis_im
+    mvis = mvis[chpad:-chpad,:]
 
     # populate both polarizations
     mvis = np.tile(mvis, (2, 1, 1))

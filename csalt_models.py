@@ -205,7 +205,7 @@ def vismodel_full(pars, fixed, dataset,
     ### - Compute the model visibilities
     # Loop through timestamps to get raw (sky) visibilities
     mvis_pure = np.squeeze(np.empty((dataset.npol, nch, dataset.nvis, 2)))
-    for itime in [0,1,2]:	#range(dataset.nstamps):
+    for itime in range(dataset.nstamps):
         # track the steps
         print('timestamp '+str(itime+1)+' / '+str(dataset.nstamps))
 

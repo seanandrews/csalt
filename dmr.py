@@ -29,9 +29,9 @@ for i in range(data_dict['nobs']):
     modelvis = vismodel(theta, theta_fixed, vdata)
 
     # pack dataset and model back into file
-    os.system('rm -rf '+inp.dataname+'_EB'+str(i)+'.npz')
+    os.system('rm -rf '+inp.dataname+'_EB'+str(i)+'.MOD.npz')
     np.savez_compressed(inp.dataname+'_EB'+str(i)+'.MOD', 
-                        model=modelvis, resid=vdata.data - modelvis)
+                        model=modelvis, resid=vdata.vis - modelvis)
 
 
 # convert the model and residual visibilities into MS format

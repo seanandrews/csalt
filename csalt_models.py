@@ -12,6 +12,7 @@ import numpy as np
 from astropy.io import fits
 from vis_sample import vis_sample
 from scipy.ndimage import convolve1d
+from scipy.interpolate import interp1d
 from vis_sample.classes import *
 from simple_disk import simple_disk
 import const as const
@@ -304,15 +305,16 @@ def vismodel_def(pars, fixed, dataset,
     # sample the FT of the cube onto the observed spatial frequencies
     mvis, gcf, corr = vis_sample(imagefile=mcube, uu=uu, vv=vv, mu_RA=pars[11], 
                                  mu_DEC=pars[12], return_gcf=True, 
-                                 return_corr_cache=True, mod_interp=False).T
+                                 return_corr_cache=True, mod_interp=False)
+    mvis = mvis.T
 
     # distribute interpolates to different timestamps
     for itime in range(dataset.nstamps):
         ixl = np.min(np.where(dataset.tstamp == itime))
         ixh = np.max(np.where(dataset.tstamp == itime)) + 1
-        fint = interp1d(v_model, mvis[:,ix_lo:ix_hi], axis=0, kind=imethod, 
+        fint = interp1d(v_model, mvis[:,ixl:ixh], axis=0, kind=imethod, 
                         fill_value='extrapolate')
-        mvis[:,ix_lo:ix_hi] = fint(v_grid[itime,:])
+        mvis[:,ixl:ixh] = fint(v_grid[itime,:])
 
     # convolve with the SRF
     SRF_kernel = np.array([0, 0.25, 0.5, 0.25, 0])

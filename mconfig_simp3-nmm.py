@@ -18,9 +18,15 @@ nu_rest = 230.538e9			# spectral line rest frequency (Hz)
 V_sys = 5.2e3				# estimate of systemic velocity (m/s)
 dVb   = 10e3				# desired +/- range around V_sys (m/s)
 bounds_V = [V_sys-dVb, V_sys+dVb]	# LSRK velocity bounds to extract (m/s)
-chpad = 5				# pad channels on each end of bounds_V
+bounds_pad = 5				# pad channels on each end of bounds_V
 tavg = ''				# time-averaging interval for orig_MS
 					# (no averaging == '')
+
+
+
+# likelihood calculation information
+chpad = 3
+chbin = [2]
 
 
 

@@ -1,6 +1,6 @@
 import os, sys
 import numpy as np
-execfile('fconfig_'+sys.argv[-1]+'.py')
+execfile('mconfig_'+sys.argv[-1]+'.py')
 execfile('CASA_scripts/image_cube.py')
 
 
@@ -10,21 +10,25 @@ nobs = data_dict['nobs']
 
 
 # process the model and residual MS
-for filetype in ['MOD', 'RES']:
+for i in range(nobs):
+    # load model and residual visibilities
+    m_ = np.load(dataname+'_EB'+str(i)+'.MOD.npz')
 
-    # loop through to create (if necessary) and regrid MS files for each EB
-    for i in range(nobs):
-        os.system('rm -rf '+dataname+'_EB'+str(i)+'.'+filetype+'.ms*')
-        os.system('cp -r '+dataname+'_EB'+str(i)+'.DAT.ms '+\
-                           dataname+'_EB'+str(i)+'.'+filetype+'.ms')
-        model_vis = np.load(dataname+'_EB'+str(i)+'.npz')['model']
-        tb.open(dataname+'_EB'+str(i)+'.'+filetype+'.ms', nomodify=False)
-        if filetype == 'MOD':
-            tb.putcol("DATA", model_vis)
-        else:
-            data_vis = tb.getcol("DATA")
-            tb.putcol("DATA", data_vis - model_vis)
-        tb.close()
+    # pack up model
+    os.system('rm -rf '+dataname+'_EB'+str(i)+'.MOD.ms*')
+    os.system('cp -r '+dataname+'_EB'+str(i)+'.DAT.ms '+\
+                       dataname+'_EB'+str(i)+'.MOD.ms')
+    tb.open(dataname+'_EB'+str(i)+'.MOD.ms', nomodify=False)
+    tb.putcol("DATA", m_['model'])
+    tb.close()
+
+    # pack up residuals
+    os.system('rm -rf '+dataname+'_EB'+str(i)+'.RES.ms*')
+    os.system('cp -r '+dataname+'_EB'+str(i)+'.DAT.ms '+\
+                       dataname+'_EB'+str(i)+'.RES.ms')
+    tb.open(dataname+'_EB'+str(i)+'.RES.ms', nomodify=False)
+    tb.putcol("DATA", m_['resid'])
+    tb.close()
 
 
 # Make a (Keplerian) mask if requested (or it doesn't already exist)

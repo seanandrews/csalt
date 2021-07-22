@@ -14,7 +14,7 @@ outdir   = 'data/'+basename+'/'
 dataname = outdir+basename+extname
 
 # data reduction parameters
-nu_rest = 230.538e9			# spectral line rest frequency (Hz)
+restfreq = 230.538e9			# spectral line rest frequency (Hz)
 V_sys = 5.2e3				# estimate of systemic velocity (m/s)
 dVb   = 10e3				# desired +/- range around V_sys (m/s)
 bounds_V = [V_sys-dVb, V_sys+dVb]	# LSRK velocity bounds to extract (m/s)

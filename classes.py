@@ -55,8 +55,30 @@ class fitdata:
                 vra = vra[::-1]
             sgn_v = np.sign(np.diff(vra)[0])
 
-            # clip the data to lie within the desired velocity bounds
-            if (sgn_v < 0):
+            # find where to clip to lie within the desired velocity bounds
+            midstamp = np.int(idata.nstamps/2)
+            ixl = np.abs(v_LSRK[midstamp,:] - vra[0]).argmin()
+            ixh = np.abs(v_LSRK[midstamp,:] - vra[1]).argmin()
+
+            # reconcile channel set to be evenly divisible by binning factor
+            if ((ixh - ixl + (ixh - ixl) % inp.chbin[i]) < idata.nchan):
+                for j in range((ixh - ixl) % inp.chbin[i]):
+                    if not (ixh == idata.nchan-1):
+                        ixh += 1
+                    elif not (ixl == 0):
+                        ixl -= 1
+                    else:
+                        if j % 2 == 0: 
+                            ixh -= 1
+                        else:
+                            ixl += 1
+
+            # clip the data
+            v_LSRK = v_LSRK[:,ixl:ixh]
+            idata.nu_LSRK = idata.nu_LSRK[:,ixl:ixh]
+            idata.nu_TOPO = idata.nu_TOPO[ixl:ixh]
+            idata.nchan = len(idata.nu_TOPO)
+            idata.vis = idata.vis[:,ixl:ixh,:]
+           
                 
-            print(sgn_v)
             sys.exit() 

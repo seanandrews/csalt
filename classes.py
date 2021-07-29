@@ -59,7 +59,7 @@ class inf_dataset:
 
 
 # Data parsing to generate inputs for likelihood function
-def fitdata(file_prefix, vra, vcensor):
+def fitdata(file_prefix, vra=None, vcensor=None):
 
     # Load the configuration file
     inp = importlib.import_module('mconfig_'+file_prefix)
@@ -86,6 +86,7 @@ def fitdata(file_prefix, vra, vcensor):
         v_LSRK = const.c_ * (1 - idata.nu_LSRK / inp.restfreq)
 
         # fix direction of desired velocity bounds, based on data format
+        if vra is None: vra = [-1e5, 1e5]
         dvi, dvra = np.diff(v_LSRK, axis=1), np.diff(vra)
         if np.logical_or(np.logical_and(np.all(dvi<0), np.all(dvra>0)),
                          np.logical_and(np.all(dvi>0), np.all(dvra<0))): 
@@ -127,7 +128,30 @@ def fitdata(file_prefix, vra, vcensor):
         bvis = np.average(ivis.reshape((idata.npol, -1, inp.chbin[i], 
                                         idata.nvis)), weights=wt, axis=2)
         bwgt = np.sum(wt, axis=2)
-          
+
+        # channel censoring
+        if vcensor is not None:
+            # determine number of censoring zones
+            ncens = len(vcensor)
+
+            # approximate velocities of binned channels
+            v_ = iv_LSRK[midstamp,:]
+            v_bin = np.average(v_.reshape(-1, inp.chbin[i]), axis=1)
+
+            # identify which (binned) channels are censored (==False)
+            cens_chans = np.ones(inchan, dtype='bool')
+            for j in range(ncens):
+                if sgn_v < 0:
+                    vcens = (vcensor[j])[::-1]
+                else: vcens = vcensor[j]
+                ixl = np.abs(iv_LSRK[midstamp,:] - vcens[0]).argmin()
+                ixh = np.abs(iv_LSRK[midstamp,:] - vcens[1]).argmin()
+                cens_chans[ixl:ixh+1] = False
+            cens_chans = np.all(cens_chans.reshape((-1, inp.chbin[i])), axis=1)
+
+            # set weights --> 0 in censored channels
+            bwgt[:,cens_chans == False,:] = 0
+           
         # pre-calculate the spectral covariance matrix and its inverse
         if inp.chbin[i] == 2:
             di, odi = (5./16), (3./32)

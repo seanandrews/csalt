@@ -282,20 +282,19 @@ def vismodel_def(pars, fixed, dataset,
     dnu_TOPO = np.diff(dataset.nu_TOPO)[0]
     nu_TOPO_s = dataset.nu_TOPO[0] + dnu_TOPO * np.arange(-chpad, 0, 1)
     nu_TOPO_f = dataset.nu_TOPO[-1] + dnu_TOPO * np.arange(1, chpad+1, 1)
-    dataset.nu_TOPO = np.concatenate((nu_TOPO_s, dataset.nu_TOPO, nu_TOPO_f))
+    nu_TOPO = np.concatenate((nu_TOPO_s, dataset.nu_TOPO, nu_TOPO_f))
 
     dnu_LSRK = np.diff(dataset.nu_LSRK, axis=1)[:,0]
     nu_LSRK_s = (dataset.nu_LSRK[:,0])[:,None] + \
                 dnu_LSRK[:,None] * np.arange(-chpad, 0, 1)[None,:]
     nu_LSRK_f = (dataset.nu_LSRK[:,-1])[:,None] + \
                 dnu_LSRK[:,None] * np.arange(1, chpad+1, 1)[None,:]
-    dataset.nu_LSRK = np.concatenate((nu_LSRK_s, dataset.nu_LSRK, nu_LSRK_f),
-                                     axis=1)
+    nu_LSRK = np.concatenate((nu_LSRK_s, dataset.nu_LSRK, nu_LSRK_f), axis=1)
 
     # LSRK velocities at midpoint of execution block
-    mid_stamp = np.int(dataset.nu_LSRK.shape[0] / 2)
-    v_model = const.c_ * (1 - dataset.nu_LSRK[mid_stamp,:] / restfreq)
-    v_grid = const.c_ * (1 - dataset.nu_LSRK / restfreq)
+    mid_stamp = np.int(nu_LSRK.shape[0] / 2)
+    v_model = const.c_ * (1 - nu_LSRK[mid_stamp,:] / restfreq)
+    v_grid = const.c_ * (1 - nu_LSRK / restfreq)
 
     # generate a model cube
     mcube = cube_parser(pars[:npars-3], FOV=FOV, Npix=Npix, dist=dist,
@@ -331,3 +330,59 @@ def vismodel_def(pars, fixed, dataset,
         return mvis, gcf, corr
     else:
         return mvis
+
+
+def vismodel_iter(pars, fixed, dataset, gcf, corr, imethod='cubic', chpad=3):
+
+    ### - Prepare inputs
+    # Parse fixed parameters
+    restfreq, FOV, Npix, dist, rmax = fixed
+    npars = len(pars)
+
+    # Pad the frequency arrays
+    dnu_TOPO = np.diff(dataset.nu_TOPO)[0]
+    nu_TOPO_s = dataset.nu_TOPO[0] + dnu_TOPO * np.arange(-chpad, 0, 1)
+    nu_TOPO_f = dataset.nu_TOPO[-1] + dnu_TOPO * np.arange(1, chpad+1, 1)
+    nu_TOPO = np.concatenate((nu_TOPO_s, dataset.nu_TOPO, nu_TOPO_f))
+
+    dnu_LSRK = np.diff(dataset.nu_LSRK, axis=1)[:,0]
+    nu_LSRK_s = (dataset.nu_LSRK[:,0])[:,None] + \
+                dnu_LSRK[:,None] * np.arange(-chpad, 0, 1)[None,:]
+    nu_LSRK_f = (dataset.nu_LSRK[:,-1])[:,None] + \
+                dnu_LSRK[:,None] * np.arange(1, chpad+1, 1)[None,:]
+    nu_LSRK = np.concatenate((nu_LSRK_s, dataset.nu_LSRK, nu_LSRK_f), axis=1)
+
+    # LSRK velocities at midpoint of execution block
+    mid_stamp = np.int(dataset.nu_LSRK.shape[0] / 2)
+    v_model = const.c_ * (1 - nu_LSRK[mid_stamp,:] / restfreq)
+    v_grid = const.c_ * (1 - nu_LSRK / restfreq)
+
+    # generate a model cube
+    mcube = cube_parser(pars[:npars-3], FOV=FOV, Npix=Npix, dist=dist,
+                        r_max=rmax, Vsys=pars[10], restfreq=restfreq,
+                        vel=v_model)
+
+    # sample the FT of the cube onto the observed spatial frequencies
+    mvis = vis_sample(imagefile=mcube, mu_RA=pars[11], mu_DEC=pars[12], 
+                      gcf_holder=gcf, corr_cache=corr, mod_interp=False).T
+
+    # distribute interpolates to different timestamps
+    for itime in range(dataset.nstamps):
+        ixl = np.min(np.where(dataset.tstamp == itime))
+        ixh = np.max(np.where(dataset.tstamp == itime)) + 1
+        fint = interp1d(v_model, mvis[:,ixl:ixh], axis=0, kind=imethod,
+                        fill_value='extrapolate')
+        mvis[:,ixl:ixh] = fint(v_grid[itime,:])
+
+    # convolve with the SRF
+    SRF_kernel = np.array([0, 0.25, 0.5, 0.25, 0])
+    mvis_re = convolve1d(mvis.real, SRF_kernel, axis=0, mode='nearest')
+    mvis_im = convolve1d(mvis.imag, SRF_kernel, axis=0, mode='nearest')
+    mvis = mvis_re + 1.0j*mvis_im
+    mvis = mvis[chpad:-chpad,:]
+
+    # populate both polarizations
+    mvis = np.tile(mvis, (2, 1, 1))
+
+    # return the model visibilities
+    return mvis

@@ -1,7 +1,7 @@
 import os, sys, time, importlib
 import numpy as np
 import const as const
-from classes import dataset
+from csalt_data import dataset
 from csalt_models import vismodel_def as vismodel
 
 

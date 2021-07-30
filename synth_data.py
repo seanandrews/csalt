@@ -11,7 +11,7 @@
 """
 import os, sys, importlib
 import numpy as np
-from classes import dataset
+from csalt_data import dataset
 from csalt_models import vismodel_full as vismodel
 
 

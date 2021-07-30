@@ -29,26 +29,27 @@ class dataset:
 # Inference-specific dataset object
 class inf_dataset:
 
-    def __init__(self, uu, vv, v_LSRK, tstamp_ID, vis_bin, wgt_bin, 
-                 M_bin, invM_bin, lnL0):
+    def __init__(self, um, vm, vis_bin, wgt_bin, nu_TOPO, nu_LSRK, tstamp_ID, 
+                 iwgt, M_bin, invM_bin, lnL0):
 
         # spatial frequencies in lambda units
-        self.uu = uu
-        self.vv = vv
+        self.um = um
+        self.vm = vm
 
         # timestamps (indices)
         self.tstamp = tstamp_ID
         self.nstamps = len(np.unique(tstamp_ID))
 
-        # **unbinned** LSRK velocity grid, model input velocities
-        self.v_LSRK = v_LSRK
-        self.v_calc = v_LSRK[np.int(self.nstamps / 2),:]
+        # **unbinned** frequencies in Hz units (LSRK for each timestamp)
+        self.nu_TOPO = nu_TOPO
+        self.nu_LSRK = nu_LSRK
 
         # **binned** data visibilities, weights
         self.vis = vis_bin
         self.wgt = wgt_bin
+        self.iwgt = iwgt
         self.npol, self.nchan, self.nvis = self.vis.shape
-        self.chbin = np.int(len(self.v_calc) / self.vis.shape[1])
+        self.chbin = np.int(len(self.nu_TOPO) / self.vis.shape[1])
 
         # likelihood-related quantities
         self.cov = M_bin
@@ -112,15 +113,12 @@ def fitdata(file_prefix, vra=None, vcensor=None):
                         ixl += 1
 
         # clip the data to cover only the frequencies of interest
-        iv_LSRK = v_LSRK[:,ixl:ixh]
+        inu_TOPO = idata.nu_TOPO[ixl:ixh]
         inu_LSRK = idata.nu_LSRK[:,ixl:ixh]
+        iv_LSRK = v_LSRK[:,ixl:ixh]
         inchan = inu_LSRK.shape[1]
         ivis = idata.vis[:,ixl:ixh,:]
         iwgt = idata.wgt[:,ixl:ixh,:]
-
-        # convert spatial frequencies to lambda units
-        iu = idata.um * np.mean(inu_LSRK[np.int(idata.nstamps/2),:]) / const.c_
-        iv = idata.vm * np.mean(inu_LSRK[np.int(idata.nstamps/2),:]) / const.c_
 
         # spectral binning
         bnchan = np.int(inchan / inp.chbin[i])
@@ -174,8 +172,9 @@ def fitdata(file_prefix, vra=None, vcensor=None):
         lnL0 = -0.5*(np.prod(bvis.shape) * np.log(2*np.pi) + np.sum(dterm))
 
         # package the data and add to the output dictionary
-        out_dict[str(i)] = inf_dataset(iu, iv, iv_LSRK, idata.tstamp, 
-                                       bvis, bwgt, scov, scov_inv, lnL0)
+        out_dict[str(i)] = inf_dataset(idata.um, idata.vm, bvis, bwgt, 
+                                       inu_TOPO, inu_LSRK, idata.tstamp, iwgt,
+                                       scov, scov_inv, lnL0)
 
     # return the output dictionary
     return out_dict

@@ -12,15 +12,15 @@ file_prefix = 'simp3-nmm'
 inp = importlib.import_module('mconfig_'+file_prefix)
 
 # package data for inference purposes
-data_ = fitdata('simp3-nmm', vra=[3000, 8000])
+data_ = fitdata('simp3-nmm', vra=[1000, 11000])
 
 # set initial parameter guesses
 theta0 = np.array([inp.incl, inp.PA, inp.mstar, inp.r_l, inp.z0, inp.psi,
                    inp.Tb0, inp.q, inp.Tback, inp.dV0,
                    inp.vsys, inp.xoff, inp.yoff])
-dtheta0 = np.array([20., 20., inp.mstar, 100., 2.0, 1.0, 
-                    100., 0.5, 10., 200.,
-                    1.0, 0.1, 0.1])
+dtheta0 = np.array([20., 20., 0.3, 100., 2.0, 0.5, 
+                    100., 0.25, 10., 200.,
+                    1000.0, 0.1, 0.1])
 p_lo, p_hi = theta0 - dtheta0, theta0 + dtheta0
 ndim, nwalk = len(p_lo), 5 * len(p_lo)
 p0 = [np.random.uniform(p_lo, p_hi, ndim) for i in range(nwalk)]
@@ -110,8 +110,8 @@ def lnprob(theta):
         # compute the log-likelihood
         lnL = -0.5 * np.tensordot(resid, np.dot(dat.inv_cov, var * resid))
 
-    # return the log-posterior and log-prior (NEED TO NORMALIZE LNL STILL)
-    return lnL + lnT, lnT
+    # return the log-posterior and log-prior
+    return lnL + dat.lnL0 + lnT, lnT
 
 
 
@@ -122,7 +122,7 @@ backend = emcee.backends.HDFBackend(filename)
 backend.reset(nwalk, ndim)
 
 # run the sampler
-max_steps = 100
+max_steps = 3000
 with Pool() as pool:
     sampler = emcee.EnsembleSampler(nwalk, ndim, lnprob, pool=pool, 
                                     backend=backend)
@@ -130,7 +130,6 @@ with Pool() as pool:
     sampler.run_mcmc(p0, max_steps, progress=True)
 t1 = time.time()
 
-print(' ')
 print(' ')
 print(' ')
 print('This run took %.2f hours' % ((t1 - t0) / 3600))

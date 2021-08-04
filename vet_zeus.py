@@ -122,7 +122,7 @@ def lnprob(theta):
 #backend.reset(nwalk, ndim)
 
 # run the sampler
-max_steps = 5
+max_steps = 1000
 with Pool() as pool:
     sampler = zeus.EnsembleSampler(nwalk, ndim, lnprob, pool=pool)
                  
@@ -133,6 +133,7 @@ print(' ')
 sampler.summary
 
 # save the samples
+os.system('rm -rf posteriors/'+file_prefix+'_zeus.npz')
 np.savez('posteriors/'+file_prefix+'_zeus.npz', samples=sampler.get_chain(),
          log_prob=sampler.get_log_prob(), log_priors=sampler.get_blobs()) 
 
@@ -140,7 +141,3 @@ np.savez('posteriors/'+file_prefix+'_zeus.npz', samples=sampler.get_chain(),
 print(' ')
 print(' ')
 print('This run took %.2f hours' % ((t1 - t0) / 3600))
-
-
-samples = sampler.get_chain()
-print(samples.shape)

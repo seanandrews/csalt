@@ -126,9 +126,5 @@ if np.int(sys.argv[2]) > 0:
     for idim in range(ndim):
         fmt = '{:.'+str(np.abs(np.int(np.log10(prec[idim]))))+'f}'
         pk, hi, lo, med = post_summary(samples_[:,idim], prec=prec[idim])
-        #o = '{:6} = '+fmt+' +'+fmt+' / -'+fmt.format(lbls[idim], pk, hi, lo)
-        o = '{:5} = '.format(lbls[idim])
-        o += fmt+' / -'.format(pk)
-        #b = fmt+' +{:.2f} / -{:.2f}'.format(lbls[idim], pk, hi, lo)
-        print(o)
-        #print('%s = '+fmt+' +'+fmt+' / -'+fmt % (lbls[idim], pk, hi, lo)) 
+        print((lbls[idim] + ' = '+fmt+' +'+fmt+' / -'+fmt).format(pk, hi, lo))
+    print(' ')

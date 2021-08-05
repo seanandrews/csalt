@@ -29,6 +29,6 @@ DECdeg = np.sum(np.array(DEC_pieces) / [1., 60., 3600.])
 
 
 # observation settings
-integ  = '30s'		# integration time
-ttotal = '15min'	# total on-source EB time
+integ  = '6s'		# integration time
+ttotal = '20min'	# total on-source EB time
 config = '6'		# antenna configuration index

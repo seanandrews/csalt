@@ -19,7 +19,7 @@ V_sys = 5.2e3				# estimate of systemic velocity (m/s)
 dVb   = 10e3				# desired +/- range around V_sys (m/s)
 bounds_V = [V_sys-dVb, V_sys+dVb]	# LSRK velocity bounds to extract (m/s)
 bounds_pad = 5				# pad channels on each end of bounds_V
-tavg = ''				# time-averaging interval for orig_MS
+tavg = '30s'				# time-averaging interval for orig_MS
 					# (no averaging == '')
 
 

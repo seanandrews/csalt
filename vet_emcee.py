@@ -14,6 +14,7 @@ inp = importlib.import_module('mconfig_'+file_prefix)
 # package data for inference purposes
 data_ = fitdata('simp3-nmm', vra=[1000, 11000])
 
+
 # set initial parameter guesses
 theta0 = np.array([inp.incl, inp.PA, inp.mstar, inp.r_l, inp.z0, inp.psi,
                    inp.Tb0, inp.q, inp.Tback, inp.dV0,
@@ -116,7 +117,7 @@ def lnprob(theta):
 
 
 # Configure emcee backend
-filename = 'posteriors/'+file_prefix+'.h5'
+filename = 'posteriors/'+file_prefix+'_timeavg.h5'
 os.system('rm -rf '+filename)
 backend = emcee.backends.HDFBackend(filename)
 backend.reset(nwalk, ndim)

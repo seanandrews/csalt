@@ -14,7 +14,7 @@ from post_summary import post_summary
 
 
 # load the emcee backend file
-fname = 'posteriors/'+sys.argv[1]+'.h5'
+fname = 'posteriors/'+sys.argv[1]+'_pixelization2x.h5'
 reader = emcee.backends.HDFBackend(fname)
 
 # parse the samples
@@ -121,7 +121,7 @@ if np.int(sys.argv[2]) > 0:
 
     # Parameter inferences (1-D marginalized)
     print(' ')
-    prec = [0.01, 0.01, 0.001, 0.1, 0.01, 0.01, 0.1, 0.01, 0.1, 0.1, 0.1, 
+    prec = [0.01, 0.01, 0.001, 0.1, 0.01, 0.01, 0.1, 0.001, 0.1, 0.1, 0.1, 
             0.0001, 0.0001]
     for idim in range(ndim):
         fmt = '{:.'+str(np.abs(np.int(np.log10(prec[idim]))))+'f}'

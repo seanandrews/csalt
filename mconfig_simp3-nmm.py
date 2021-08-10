@@ -40,7 +40,7 @@ mstar, z0, psi, r_l = 0.7, 2.3, 1, 200.
 Tb0, q, Tback, dV0 = 205., 0.5, 20., 348.
 
 # fixed
-FOV, Npix, dist = 10.24, 256, 150.
+FOV, Npix, dist = 10.24, 512, 150.
 rmax = dist * 0.5 * FOV 		# maximum radius of emission (au)
 
 

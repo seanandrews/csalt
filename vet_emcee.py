@@ -117,7 +117,7 @@ def lnprob(theta):
 
 
 # Configure emcee backend
-filename = 'posteriors/'+file_prefix+'_timeavg.h5'
+filename = 'posteriors/'+file_prefix+'_pixelization2x.h5'
 os.system('rm -rf '+filename)
 backend = emcee.backends.HDFBackend(filename)
 backend.reset(nwalk, ndim)

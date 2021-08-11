@@ -31,7 +31,7 @@ if not os.path.exists(inp.template_dir+'sims'):
 
 # Generate the template
 
-os.system('rm -rf CASA_logs/mock_obs_'+sys.argv[-1]+'.log')
-os.system('casa --nologger '
-          + '--logfile CASA_logs/mock_obs_{}.log '.format(template_name)
+os.system('rm -rf CASA_logs/mock_obs_{}.log'.format(template_name))
+os.system('casa --nologger --logfile '
+          + 'CASA_logs/mock_obs_{}.log '.format(template_name)
           + '-c CASA_scripts/mock_obs.py {}'.format(template_name))

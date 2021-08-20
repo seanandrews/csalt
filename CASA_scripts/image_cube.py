@@ -4,12 +4,12 @@ execfile('/home/sandrews/mypy/keplerian_mask/keplerian_mask.py')
 
 def generate_kepmask(setupname, MSname, imgname):
 
-    execfile('fconfig_'+setupname+'.py')
+    execfile('mconfig_'+setupname+'.py')
 
     # make a dirty image cube to guide the mask
     tclean(vis=MSname+'.ms', imagename=imgname+'_dirty', specmode='cube', 
            start=chanstart, width=chanwidth, nchan=nchan_out,
-           outframe='LSRK', veltype='radio', restfreq=str(nu_rest/1e9)+'GHz',
+           outframe='LSRK', veltype='radio', restfreq=str(restfreq/1e9)+'GHz',
            imsize=imsize, cell=cell, deconvolver='multiscale', scales=scales, 
            gain=gain, niter=0, nterms=1, interactive=False, weighting='briggs', 
            robust=robust, uvtaper=uvtaper, restoringbeam='common')
@@ -34,7 +34,7 @@ def generate_kepmask(setupname, MSname, imgname):
 
 def clean_cube(setupname, MSname, imgname, maskname=None):
 
-    execfile('fconfig_'+setupname+'.py')
+    execfile('mconfig_'+setupname+'.py')
 
     # if necessary, make a mask
     if maskname is None:
@@ -49,7 +49,7 @@ def clean_cube(setupname, MSname, imgname, maskname=None):
     # make a clean image cube
     tclean(vis=MSname, imagename=imgname, specmode='cube', datacolumn='data',
            start=chanstart, width=chanwidth, nchan=nchan_out,
-           outframe='LSRK', veltype='radio', restfreq=str(nu_rest/1e9)+'GHz',  
+           outframe='LSRK', veltype='radio', restfreq=str(restfreq/1e9)+'GHz',  
            imsize=imsize, cell=cell, deconvolver='multiscale', scales=scales, 
            gain=gain, niter=1000000, nterms=1, interactive=False, 
            weighting='briggs', robust=robust, uvtaper=uvtaper,

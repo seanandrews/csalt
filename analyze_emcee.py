@@ -14,7 +14,7 @@ from post_summary import post_summary
 
 
 # load the emcee backend file
-fname = 'posteriors/'+sys.argv[1]+'_pixelization2x.h5'
+fname = 'posteriors/'+sys.argv[1]+'.h5'
 reader = emcee.backends.HDFBackend(fname)
 
 # parse the samples

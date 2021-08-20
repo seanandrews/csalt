@@ -8,11 +8,11 @@ os.environ["OMP_NUM_THREADS"] = "1"
 
 
 # configuration file
-file_prefix = 'simp3-nmm'
+file_prefix = 'simple2-lmm'
 inp = importlib.import_module('mconfig_'+file_prefix)
 
 # package data for inference purposes
-data_ = fitdata('simp3-nmm', vra=[1000, 11000])
+data_ = fitdata(file_prefix, vra=[0, 10400])
 
 
 # set initial parameter guesses
@@ -117,7 +117,7 @@ def lnprob(theta):
 
 
 # Configure emcee backend
-filename = 'posteriors/'+file_prefix+'_pixelization2x.h5'
+filename = 'posteriors/'+file_prefix+inp.extname+'.h5'
 os.system('rm -rf '+filename)
 backend = emcee.backends.HDFBackend(filename)
 backend.reset(nwalk, ndim)

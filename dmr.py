@@ -12,7 +12,7 @@ inp = importlib.import_module('mconfig_'+sys.argv[-1])
 theta = np.array([inp.incl, inp.PA, inp.mstar, inp.r_l, inp.z0, inp.psi, 
                   inp.Tb0, inp.q, inp.Tback, inp.dV0, 
                   inp.vsys, inp.xoff, inp.yoff])
-theta_fixed = inp.nu_rest, inp.FOV, inp.Npix, inp.dist, inp.rmax
+theta_fixed = inp.restfreq, inp.FOV, inp.Npix, inp.dist, inp.rmax
 
 # load metadata
 data_dict = np.load(inp.dataname+'.npy', allow_pickle=True).item()

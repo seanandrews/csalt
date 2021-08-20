@@ -5,11 +5,11 @@ import numpy as np
 ### data configuration and storage
 # inputs 
 orig_dir = 'synth_storage/simp3/'
-orig_MS  = orig_dir+'simp3-nmm.pure.ms'
+orig_MS  = orig_dir+'simp3-nmm.noisy.ms'
 
 # outputs
 basename = 'simp3-nmm'
-extname  = '.pure'
+extname  = '.noisy'
 outdir   = 'data/'+basename+'/'
 dataname = outdir+basename+extname
 
@@ -40,7 +40,7 @@ mstar, z0, psi, r_l = 0.7, 2.3, 1, 200.
 Tb0, q, Tback, dV0 = 205., 0.5, 20., 348.
 
 # fixed
-FOV, Npix, dist = 10.24, 512, 150.
+FOV, Npix, dist = 10.24, 256, 150.
 rmax = dist * 0.5 * FOV 		# maximum radius of emission (au)
 
 

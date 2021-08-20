@@ -1,21 +1,19 @@
 """
-    mk_template.py
+A script to generate an observational template -- a set of (u, v) tracks -- to 
+use in generating synthetic observations.
 
-    Usage: 
-        > python mk_template.py <template_name>
+The settings are controlled by the user in 'tconfig_<template_name>.py'.
 
-    Settings are edited by the user in 'tconfig_<template_name>.py'.
-
-    Outputs:
-	- see CASA_scripts/mock_obs.py
+Usage: 
+	> python mk_template.py <template_name>
 """
-import os, sys, time, importlib
-import numpy as np
-import const as const
+
+import os, sys, importlib
 
 
 # Load template inputs
-inp = importlib.import_module('tconfig_'+sys.argv[-1])
+template_name = sys.argv[-1]
+inp = importlib.import_module('tconfig_'+template_name)
 
 
 # Set up template storage space (if necessary)
@@ -28,6 +26,6 @@ elif not os.path.exists(inp.template_dir+'sims'):
 
 
 # Generate the template
-os.system('rm -rf CASA_logs/mock_obs_'+sys.argv[-1]+'.log')
-os.system('casa --nologger --logfile CASA_logs/mock_obs_'+sys.argv[-1]+\
-          '.log -c CASA_scripts/mock_obs.py '+sys.argv[-1])
+os.system('rm -rf CASA_logs/mock_obs_'+template_name+'.log')
+os.system('casa --nologger --logfile CASA_logs/mock_obs_'+template_name+\
+          '.log -c CASA_scripts/mock_obs.py '+template_name)

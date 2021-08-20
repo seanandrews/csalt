@@ -21,13 +21,13 @@ import matplotlib.pyplot as plt
 
 def cube_parser(pars, FOV=8, Npix=128, dist=150, r_min=0, r_max=500, r0=10,
                 RA=240, DEC=-40, restfreq=230.538e9, Vsys=0, vel=None,
-                datafile=None, outfile=None):
+                datafile=None, outfile=None, Tbeps=np.inf):
 
     ### Generate a model disk
     disk = simple_disk(pars[0], pars[1], x0=0, y0=0, dist=dist, mstar=pars[2], 
                        r_min=r_min, r_max=r_max, r0=r0, r_l=pars[3],
                        z0=pars[4], zpsi=pars[5], zphi=np.inf, 
-                       Tb0=pars[6], Tbq=pars[7], Tbeps=np.inf, Tbmax=1000, 
+                       Tb0=pars[6], Tbq=pars[7], Tbeps=Tbeps, Tbmax=1000, 
                        Tbmax_b=pars[8], tau0=1000, tauq=0, taueta=np.inf, 
                        taumax=5000, dV0=pars[9], dVq=0.5*pars[7], dVmax=1000, 
                        FOV=FOV, Npix=Npix)

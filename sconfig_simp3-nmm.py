@@ -9,7 +9,7 @@ template = ['nmm']			# always a list, even for 1 template
 
 # Output storage
 storage_dir = 'synth_storage'
-basename = 'simp3'
+basename = 'simple2'
 
 
 # Synthetic data settings
@@ -26,8 +26,8 @@ pars  = np.array([40, 130, 0.7, 200, 2.3, 1, 205, 0.5, 20, 348, 5.2e3, 0, 0])
 npars = len(pars)
 
 # fixed setup parameters
-FOV  = 10.24		# full field of view (arcsec)
-Npix = 1024 		# number of pixels per FOV
+FOV  = 6.4		# full field of view (arcsec)
+Npix = 256  		# number of pixels per FOV
 dist = 150.		# distance (pc)
 rmax = dist * 0.5 * FOV	# maximum radius of emission (au)
 fixed = restfreq, FOV, Npix, dist, rmax

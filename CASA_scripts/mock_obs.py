@@ -1,33 +1,32 @@
 """
-    mock_obs.py
+CASA script to generate an observational template for synthetic data.  
 
-    Usage: 
-        CASA> execfile('mock_obs.py <template_name>')
+Settings are controlled in 'tconfig_<template_name>.py'.
 
-    Settings are edited by the user in 'tconfig_<template_name>.py'.
-
-    Outputs:
-        - template_dir/sims/ directory containing CASA.simobserve outputs
-	- template_dir/<template_name>.ms containing (dummy) template MS
-	- template_dir/<template_name>.npz containing relevant MS data
+Usage: 
+	CASA> execfile('mock_obs.py <template_name>')
 """
+
 import os, sys
 import numpy as np
+import scipy.constants as sc
 execfile('tconfig_'+sys.argv[-1]+'.py')
-execfile('const.py')
 
 
-### Simulation setups
+# Simulation setups
 template = sys.argv[-1]
 os.chdir(template_dir)
 
+
 # Number of native channels needed to span the desired velocity range
-nch = 2 * np.int(vspan / (c_ * dfreq0 / restfreq)) + 1
+nch = 2 * np.int(vspan / (sc.c * dfreq0 / restfreq)) + 1
+
 
 # TOPO frequency corresponding to desired tuning velocity (center of SPW)
 t0 = au.lstToUT(au.hoursToHMS(RAdeg / 15 + np.float(HA[:-1])), date)
 dt = t0[0][:-3].replace('-', '/').replace(' ','/')
 nu_tune = au.restToTopo(restfreq, 1e-3 * vtune, dt, RA, DEC)
+
 
 # Generate a dummy cube
 dummy = ia.makearray(v=0.001, shape=[64, 64, 4, nch])  
@@ -35,8 +34,9 @@ res = ia.fromarray(outfile='dummy.image', pixels=dummy, overwrite=True)
 ia.done()
 
 
-### Simulate observations to generate the MS structure
+# Simulate observations to generate the MS structure
 os.chdir('sims')
+
 
 # Run the simulation
 simobserve(project=template+'.sim', skymodel='../dummy.image',
@@ -48,13 +48,13 @@ simobserve(project=template+'.sim', skymodel='../dummy.image',
 os.system('rm -rf *.last')
 os.chdir('..')
 
+
 # Move the simulated MS here
 os.system('rm -rf '+template+'.ms*')
 sim_MS = 'sims/'+template+'.sim/'+template+'.sim.alma.cycle7.'+config+'.ms'
 os.system('mv '+sim_MS+' '+template+'.ms')
 
 
-### Extract the MS contents for easier access
 # Access MS contents
 tb.open(template+'.ms')
 data = np.squeeze(tb.getcol("DATA"))
@@ -63,16 +63,19 @@ weights = tb.getcol('WEIGHT')
 times = tb.getcol("TIME")
 tb.close()
 
+
 # Index the timestamps
 tstamps = np.unique(times)
 tstamp_ID = np.empty_like(times)
 for i in range(len(tstamps)):
     tstamp_ID[times == tstamps[i]] = i
 
+
 # TOPO frequency channels (Hz)
 tb.open(template+'.ms/SPECTRAL_WINDOW')
 nu_TOPO = np.squeeze(tb.getcol('CHAN_FREQ'))
 tb.close()
+
 
 # LSRK frequencies (Hz) for each timestamp
 nu_LSRK = np.empty((len(tstamps), len(nu_TOPO)))
@@ -82,9 +85,11 @@ for j in range(len(tstamps)):
                                 obstime=str(tstamps[j])+'s')
 ms.close()
 
+
 # Record the results
 np.savez_compressed(template+'.npz', data=data, um=u, vm=v, weights=weights, 
                     tstamp_ID=tstamp_ID, nu_TOPO=nu_TOPO, nu_LSRK=nu_LSRK)
+
 
 # Clean up
 os.system('rm -rf dummy.image')

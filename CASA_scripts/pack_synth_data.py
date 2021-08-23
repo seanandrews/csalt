@@ -1,6 +1,8 @@
 import os, sys
 import numpy as np
-execfile('sconfig_'+sys.argv[-1]+'.py')
+
+mdlbase = sys.argv[-1]
+execfile('sconfig_'+mdlbase+'.py')
 
 
 # Loop through constituent datasets
@@ -10,12 +12,12 @@ pure_files, noisy_files = [], []
 for itmp in range(len(template)):
 
     # Load the synthetic dataset
-    dat = np.load(storage_dir+basename+'/'+sys.argv[-1]+'_EB'+str(itmp)+'.npz')
+    dat = np.load(storage_dir+basename+'/'+mdlbase+'_EB'+str(itmp)+'.npz')
     data_pure, data_noisy = dat['data_pure'], dat['data_noisy']
     weights = dat['weights']
 
     # Copy the corresponding template MS files
-    _MS = storage_dir+basename+'/'+sys.argv[-1]+'_EB'+str(itmp)
+    _MS = storage_dir+basename+'/'+mdlbase+'_EB'+str(itmp)
     os.system('rm -rf '+_MS+'.*.ms')
     os.system('cp -r '+template_dir+template[itmp]+'.ms '+_MS+'.pure.ms')
     os.system('cp -r '+template_dir+template[itmp]+'.ms '+_MS+'.noisy.ms')
@@ -40,24 +42,24 @@ for itmp in range(len(template)):
 
 
 # Concatenate MS files
-os.system('rm -rf '+storage_dir+basename+'/'+sys.argv[-1]+'.*.ms')
+os.system('rm -rf '+storage_dir+basename+'/'+mdlbase+'.*.ms')
 if len(template) > 1:
     concat(vis=pure_files, 
-           concatvis=storage_dir+basename+'/'+sys.argv[-1]+'.pure.ms',
+           concatvis=storage_dir+basename+'/'+mdlbase+'.pure.ms',
            dirtol='0.1arcsec', copypointing=False)
     concat(vis=noisy_files,
-           concatvis=storage_dir+basename+'/'+sys.argv[-1]+'.noisy.ms',
+           concatvis=storage_dir+basename+'/'+mdlbase+'.noisy.ms',
            dirtol='0.1arcsec', copypointing=False)
 else:
     os.system('cp -r '+pure_files[0]+' '+storage_dir+basename+'/'+\
-              sys.argv[-1]+'.pure.ms')
+              mdlbase+'.pure.ms')
     os.system('cp -r '+noisy_files[0]+' '+storage_dir+basename+'/'+\
-              sys.argv[-1]+'.noisy.ms')
+              mdlbase+'.noisy.ms')
 
 
 # Cleanup 
 for i in range(len(pure_files)):
     os.system('rm -rf '+pure_files[i])
     os.system('rm -rf '+noisy_files[i])
-os.system('rm -rf '+storage_dir+basename+'/'+sys.argv[-1]+'_EB*npz')
+os.system('rm -rf '+storage_dir+basename+'/'+mdlbase+'_EB*npz')
 os.system('rm -rf *.last')

@@ -9,6 +9,7 @@
     Outputs:
         - 
 """
+
 import os, sys, importlib
 import numpy as np
 from csalt_data import dataset
@@ -16,7 +17,8 @@ from csalt_models import vismodel_full as vismodel
 
 
 # Load user-defined inputs
-inp = importlib.import_module('sconfig_'+sys.argv[-1])
+mdlbase = sys.argv[-1]
+inp = importlib.import_module('sconfig_'+mdlbase)
 
 
 # Prepare storage space
@@ -24,7 +26,7 @@ if inp.storage_dir[-1] != '/': inp.storage_dir += '/'
 if not os.path.exists(inp.storage_dir+inp.basename):
     os.system('mkdir '+inp.storage_dir)
     os.system('mkdir '+inp.storage_dir+inp.basename)
-os.system('cp sconfig_'+sys.argv[-1]+'.py '+inp.storage_dir+inp.basename)
+os.system('cp sconfig_'+mdlbase+'.py '+inp.storage_dir+inp.basename)
 
 
 # Start loop over templates
@@ -43,12 +45,12 @@ for itmp in range(len(inp.template)):
 
     # Calculate model weights
     sigma_out = 1e-3 * inp.RMS[itmp] * \
-                np.sqrt(tmp_dataset.npol*tmp_dataset.nvis)
+                np.sqrt(tmp_dataset.npol * tmp_dataset.nvis)
     mwgt = np.sqrt(1 / sigma_out) * np.ones_like(tmp_dataset.wgt)
 
 
     # Temporarily store data in .npz format for each EB
-    npz_out = inp.storage_dir+inp.basename+'/'+sys.argv[-1]+'_EB'+str(itmp)
+    npz_out = inp.storage_dir+inp.basename+'/'+mdlbase+'_EB'+str(itmp)
     os.system('rm -rf '+npz_out+'.npz')
     np.savez_compressed(npz_out+'.npz', u=tmp['um'], v=tmp['vm'], 
                         data_pure=mvis_p, data_noisy=mvis_n, weights=mwgt, 
@@ -57,6 +59,6 @@ for itmp in range(len(inp.template)):
 
 
 # Pack the data into a single, concatenated MS file (like real data)
-os.system('rm -rf CASA_logs/pack_synth_data_'+sys.argv[-1]+'.log')
-os.system('casa --nologger --logfile CASA_logs/pack_synth_data_'+sys.argv[-1]+\
-          '.log -c CASA_scripts/pack_synth_data.py '+sys.argv[-1])
+os.system('rm -rf CASA_logs/pack_synth_data_'+mdlbase+'.log')
+os.system('casa --nologger --logfile CASA_logs/pack_synth_data_'+mdlbase+\
+          '.log -c CASA_scripts/pack_synth_data.py '+mdlbase)

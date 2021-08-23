@@ -1,6 +1,6 @@
 import os, sys, importlib
 import numpy as np
-import const as const
+import scipy.constants as sc
 
 # General visibility dataset object
 class dataset:
@@ -84,7 +84,7 @@ def fitdata(file_prefix, vra=None, vcensor=None):
             idata.wgt = np.rollaxis(idata.wgt, 1, 0)
 
         # convert the LSRK frequency grid to a velocity grid
-        v_LSRK = const.c_ * (1 - idata.nu_LSRK / inp.restfreq)
+        v_LSRK = sc.c * (1 - idata.nu_LSRK / inp.restfreq)
 
         # fix direction of desired velocity bounds, based on data format
         if vra is None: vra = [-1e5, 1e5]

@@ -22,7 +22,7 @@ def vismodel_full(pars, fixed, dataset,
 
     ### - Prepare inputs
     # Parse fixed parameters
-    restfreq, FOV, npix, dist, rmax = fixed
+    restfreq, FOV, npix, dist = fixed
     npars = len(pars)
 
     # Spatial frequencies to lambda units
@@ -146,7 +146,7 @@ def vismodel_def(pars, fixed, dataset,
 
     ### - Prepare inputs
     # Parse fixed parameters
-    restfreq, FOV, Npix, dist, rmax = fixed
+    restfreq, FOV, Npix, dist = fixed
     npars = len(pars)
 
     # Spatial frequencies to lambda units
@@ -209,7 +209,7 @@ def vismodel_iter(pars, fixed, dataset, gcf, corr, imethod='cubic', chpad=3):
 
     ### - Prepare inputs
     # Parse fixed parameters
-    restfreq, FOV, Npix, dist, rmax = fixed
+    restfreq, FOV, Npix, dist = fixed
     npars = len(pars)
 
     # Pad the frequency arrays

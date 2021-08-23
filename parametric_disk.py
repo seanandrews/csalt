@@ -38,7 +38,7 @@ def parametric_disk(velax, pars, pars_fixed, quiet=True):
         TBD
     """
     # Parse the inputs
-    restfreq, FOV, npix, dist, rmax = pars_fixed
+    restfreq, FOV, npix, dist = pars_fixed
     inc, PA, mstar, r_l, z_10, z_q, Tb_10, Tb_q, Tbmax_b, dV_10, \
         vlsr, dx, dy = pars
 

@@ -1,26 +1,28 @@
 import os, sys
 import numpy as np
 
-mdlbase = sys.argv[-1]
-execfile('sconfig_'+mdlbase+'.py')
+
+# Load configuration file
+fname = sys.argv[-1]
+execfile('configs_synth/sconfig_'+fname+'.py')
 
 
-# Loop through constituent datasets
+# Loop through EBs to generate individual (pure, noisy) MS files
 if storage_dir[-1] != '/': storage_dir += '/'
 if template_dir[-1] != '/': template_dir += '/'
 pure_files, noisy_files = [], []
-for itmp in range(len(template)):
+for EB in range(len(template)):
 
-    # Load the synthetic dataset
-    dat = np.load(storage_dir+basename+'/'+mdlbase+'_EB'+str(itmp)+'.npz')
+    # Load the data for this EB
+    dat = np.load(storage_dir+basename+'/'+fname+'_EB'+str(EB)+'.npz')
     data_pure, data_noisy = dat['data_pure'], dat['data_noisy']
     weights = dat['weights']
 
-    # Copy the corresponding template MS files
-    _MS = storage_dir+basename+'/'+mdlbase+'_EB'+str(itmp)
-    os.system('rm -rf '+_MS+'.*.ms')
-    os.system('cp -r '+template_dir+template[itmp]+'.ms '+_MS+'.pure.ms')
-    os.system('cp -r '+template_dir+template[itmp]+'.ms '+_MS+'.noisy.ms')
+    # Copy the MS file into pure, noisy MS copies (still "blank")
+    _MS = storage_dir+basename+'/'+fname+'_EB'+str(EB)
+    os.system('rm -rf '+_MS+'.*.ms*')
+    os.system('cp -r '+template_dir+template[EB]+'.ms '+_MS+'.pure.ms')
+    os.system('cp -r '+template_dir+template[EB]+'.ms '+_MS+'.noisy.ms')
 
     # Pack the "pure" MS table
     tb.open(_MS+'.pure.ms', nomodify=False)
@@ -42,24 +44,24 @@ for itmp in range(len(template)):
 
 
 # Concatenate MS files
-os.system('rm -rf '+storage_dir+basename+'/'+mdlbase+'.*.ms')
+os.system('rm -rf '+storage_dir+basename+'/'+fname+'.*.ms')
 if len(template) > 1:
     concat(vis=pure_files, 
-           concatvis=storage_dir+basename+'/'+mdlbase+'.pure.ms',
+           concatvis=storage_dir+basename+'/'+fname+'.pure.ms',
            dirtol='0.1arcsec', copypointing=False)
     concat(vis=noisy_files,
-           concatvis=storage_dir+basename+'/'+mdlbase+'.noisy.ms',
+           concatvis=storage_dir+basename+'/'+fname+'.noisy.ms',
            dirtol='0.1arcsec', copypointing=False)
 else:
-    os.system('cp -r '+pure_files[0]+' '+storage_dir+basename+'/'+\
-              mdlbase+'.pure.ms')
-    os.system('cp -r '+noisy_files[0]+' '+storage_dir+basename+'/'+\
-              mdlbase+'.noisy.ms')
+    os.system('cp -r '+pure_files[0]+' '+storage_dir+basename+'/'+ \
+              fname+'.pure.ms')
+    os.system('cp -r '+noisy_files[0]+' '+storage_dir+basename+'/'+ \
+              fname+'.noisy.ms')
 
 
 # Cleanup 
-for i in range(len(pure_files)):
-    os.system('rm -rf '+pure_files[i])
-    os.system('rm -rf '+noisy_files[i])
-os.system('rm -rf '+storage_dir+basename+'/'+mdlbase+'_EB*npz')
+for EB in range(len(pure_files)):
+    os.system('rm -rf '+pure_files[EB])
+    os.system('rm -rf '+noisy_files[EB])
+os.system('rm -rf '+storage_dir+basename+'/'+fname+'_EB*npz')
 os.system('rm -rf *.last')

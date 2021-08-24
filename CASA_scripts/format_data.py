@@ -8,14 +8,17 @@ execfile(sys.argv[3]+'.py')
 
 
 # Make sure outdir exists
-outdir = reduced_dir+'/'+basename+'-'+extname+'/'
+outdir = reduced_dir+'/'+basename+'/'
 if not os.path.exists(outdir):
     os.system('mkdir '+outdir)
 
 
 # Load original MS datafile
 if len(sys.argv) > 3:
-    in_MS += '.'+sys.argv[4]
+    _ext = '_'+sys.argv[4]
+    in_MS += _ext
+else:
+    _ext = ''
 tb.open(in_MS+'.ms')
 spw_col = tb.getcol('DATA_DESC_ID')
 obs_col = tb.getcol('OBSERVATION_ID')
@@ -96,25 +99,25 @@ for EB in range(nEB):
         chlo, chhi = chshi.min(), chslo.max()	
 
     # Slice out the data of interest
-    nu_TOPO = nu_TOPO_all[chlo-ch_pad:chhi+ch_pad+1]
-    nu_LSRK = nu_LSRK_all[:,chlo-ch_pad:chhi+ch_pad+1]
-    data = data_all[:,chlo-ch_pad:chhi+ch_pad+1,:]
+    nu_TOPO = nu_TOPO_all[chlo-bounds_pad:chhi+bounds_pad+1]
+    nu_LSRK = nu_LSRK_all[:,chlo-bounds_pad:chhi+bounds_pad+1]
+    data = data_all[:,chlo-bounds_pad:chhi+bounds_pad+1,:]
     if wgt_all.shape == data_all.shape: 
-        wgt = wgt_all[:,chlo-ch_pad:chhi+ch_pad+1,:]
+        wgt = wgt_all[:,chlo-bounds_pad:chhi+bounds_pad+1,:]
     else:
         wgt = wgt_all
 
     # Pack a data object into an .npz file
-    os.system('rm -rf '+dataname+'_EB'+str(EB)+'.npz')
-    np.savez_compressed(dataname+'_EB'+str(EB), data=data, um=u, vm=v, 
+    os.system('rm -rf '+dataname+_ext+'_EB'+str(EB)+'.npz')
+    np.savez_compressed(dataname+_ext+'_EB'+str(EB), data=data, um=u, vm=v, 
                         weights=wgt, tstamp_ID=tstamp_ID, 
                         nu_TOPO=nu_TOPO, nu_LSRK=nu_LSRK)
 
     # Split off a MS with the data of interest (for future imaging use)
-    os.system('rm -rf '+dataname+'_EB'+str(EB)+'.DAT.ms*')
-    spwtag = '0:'+str(chlo-ch_pad)+'~'+str(chhi+ch_pad)
+    os.system('rm -rf '+dataname+_ext+'_EB'+str(EB)+'.DAT.ms*')
+    spwtag = '0:'+str(chlo-bounds_pad)+'~'+str(chhi+bounds_pad)
     split(vis=dataname+'_tmp'+str(EB)+'.ms', 
-          outputvis=dataname+'_EB'+str(EB)+'.DAT.ms',
+          outputvis=dataname+_ext+'_EB'+str(EB)+'.DAT.ms',
           datacolumn='data', spw=spwtag)
 
 

@@ -94,8 +94,7 @@ for EB in range(len(inp.template)):
 
 
     # Store synthetic data in .npz format (for each sim / EB)
-    npz_out = inp.storage_dir+inp.basename+'/'+ \
-              inp.basename+'-'+inp.extname+'_EB'+str(EB)
+    npz_out = inp.storage_dir+inp.basename+'/'+inp.basename+'_EB'+str(EB)
     os.system('rm -rf '+npz_out+'.npz')
     np.savez_compressed(npz_out+'.npz', u=tmp['um'], v=tmp['vm'], 
                         data_pure=mvis_p, data_noisy=mvis_n, weights=mwgt, 
@@ -103,11 +102,13 @@ for EB in range(len(inp.template)):
                         tstamp_ID=tmp['tstamp_ID'])
 
 
+
 # Pack the data into a single, concatenated MS file (like real data)
 os.system('rm -rf CASA_logs/pack_synth_data.'+config_filename+'.log')
 os.system('casa --nologger --logfile CASA_logs/'+ \
           'pack_synth_data.'+config_filename+'.log '+ \
           '-c CASA_scripts/pack_synth_data.py '+config_filename)
+
 
 
 # Format the data (+ time-average if desired) 

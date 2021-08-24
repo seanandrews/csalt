@@ -122,6 +122,7 @@ def parametric_disk(velax, pars, pars_fixed, quiet=True):
     # Build the datacube.
     cube = disk.get_cube(velax=velax, vlsr=vlsr)
     cube = cube[:,::-1,:]
+    cube = np.nan_to_num(cube)
 
     # Convert to standard surface brightness units
     freq = restfreq * (1 - velax / sc.c)

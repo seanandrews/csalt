@@ -69,5 +69,5 @@ scales = [0, 10, 30, 50]
 gain = 0.1
 niter = 50000
 robust = 2.0
-threshold = '7mJy'
+threshold = '4mJy'
 uvtaper = ''

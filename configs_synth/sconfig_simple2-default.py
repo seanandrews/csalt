@@ -22,7 +22,7 @@ dataname = reduced_dir+basename+'/'+basename
 # observation settings
 template = ['lmm']
 config = ['6']
-ttotal = ['1min']
+ttotal = ['20min']
 tinteg = ['30s']
 date = ['2022/07/15']
 HA_0 = ['-0.5h']

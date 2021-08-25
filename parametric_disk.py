@@ -126,7 +126,8 @@ def parametric_disk(velax, pars, pars_fixed, quiet=True):
 
     # Convert to standard surface brightness units
     freq = restfreq * (1 - velax / sc.c)
-    cube *= 1e26 * disk.cell_sky**2 * 2 * freq[:,None,None]**2 * sc.k / sc.c**2
+    pix_area = (disk.cell_sky * np.pi / 180. / 3600.)**2
+    cube *= 1e26 * pix_area * 2 * freq[:,None,None]**2 * sc.k / sc.c**2
 
     # Pack the cube into a vis_sample SkyImage object and return
     mod_data = np.fliplr(np.rollaxis(cube, 0, 3))

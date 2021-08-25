@@ -46,7 +46,7 @@ if np.logical_or(gen_msk, ~os.path.exists(dataname+_ext+'.mask')):
 
 # Image the cubes if requested
 filetype = ['DAT', 'MOD', 'RES']
-for i in [0]:	#range(len(filetype)):
+for i in range(len(filetype)):
     if gen_img[i]:
         files_ = [dataname+_ext+'_EB'+str(j)+'.'+filetype[i]+'.ms' 
                   for j in range(nobs)]

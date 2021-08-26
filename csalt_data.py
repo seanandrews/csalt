@@ -60,10 +60,7 @@ class inf_dataset:
 
 
 # Data parsing to generate inputs for likelihood function
-def fitdata(file_prefix, vra=None, vcensor=None):
-
-    # Load the configuration file
-    inp = importlib.import_module('mconfig_'+file_prefix)
+def fitdata(inp, vra=None, vcensor=None):
 
     # Load the metadata and initialize the output dictionary
     data_dict = np.load(inp.dataname+'.npy', allow_pickle=True).item()
@@ -74,7 +71,7 @@ def fitdata(file_prefix, vra=None, vcensor=None):
     for i in range(nobs):
 
         # load the data into a dataset object
-        d_ = np.load(inp.dataname+'_EB'+str(i)+'.npz')
+        d_ = np.load(inp.dataname+inp._ext+'_EB'+str(i)+'.npz')
         idata = dataset(d_['um'], d_['vm'], d_['data'], d_['weights'],
                         d_['nu_TOPO'], d_['nu_LSRK'], d_['tstamp_ID'])
 
@@ -84,7 +81,7 @@ def fitdata(file_prefix, vra=None, vcensor=None):
             idata.wgt = np.rollaxis(idata.wgt, 1, 0)
 
         # convert the LSRK frequency grid to a velocity grid
-        v_LSRK = sc.c * (1 - idata.nu_LSRK / inp.restfreq)
+        v_LSRK = sc.c * (1 - idata.nu_LSRK / inp.nu_rest)
 
         # fix direction of desired velocity bounds, based on data format
         if vra is None: vra = [-1e5, 1e5]

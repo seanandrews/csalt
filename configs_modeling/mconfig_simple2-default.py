@@ -6,6 +6,7 @@ import numpy as np
 # naming
 basename = 'simple2-default'
 _ext = '_pure'
+_fitnote = ''
 
 reduced_dir = 'data/'+basename+'/'
 dataname = reduced_dir+basename
@@ -53,7 +54,45 @@ bounds_pad = 3
 # likelihood calculation information
 chpad = 3
 chbin = [2]
+vra_fit = [0, 10400]
+vra_cens = None
+max_steps = 3000
 
+init_incl  = [20, 60]	
+init_PA    = [100, 160]	
+init_mstar = [0.4, 1.0]	
+init_r_l   = [150, 250]	
+init_z0    = [1.0, 3.0]	
+init_psi   = [0.5, 1.5]	
+init_T0    = [150, 250]	
+init_q     = [-1., 0.]	
+init_Tmaxb = [10, 40]
+init_sigV0 = [150, 500]	
+init_Vsys  = [4.7e3, 5.7e3]
+init_dx    = [-0.1, 0.1]
+init_dy    = [-0.1, 0.1]
+init_ = np.array([init_incl, init_PA, init_mstar, init_r_l, init_z0, init_psi,
+                  init_T0, init_q, init_Tmaxb, init_sigV0, init_Vsys, 
+                  init_dx, init_dy])
+nwalkers = 5 * len(pars)
+
+pt_incl, pp_incl = 'uniform', [-90., 90.]
+pt_PA, pp_PA = 'uniform', [0., 360.]
+pt_mstar, pp_mstar = 'uniform', [0., 5.]
+pt_r_l, pp_r_l = 'uniform', [10., 0.5 * np.min(FOV) * dist]
+pt_z0, pp_z0 = 'uniform', [0., 5.]
+pt_psi, pp_psi = 'uniform', [0., 2.]
+pt_T0, pp_T0 = 'uniform', [5., 1000.]
+pt_q, pp_q = 'uniform', [-1.5, 0.]
+pt_Tmaxb, pp_Tmaxb = 'uniform', [5., 100.]
+pt_sigV0, pp_sigV0 = 'uniform', [50., 1000.]
+pt_Vsys, pp_Vsys = 'uniform', [4.2e3, 6.2e3]
+pt_dx, pp_dx = 'uniform', [-0.25, 0.25]
+pt_dy, pp_dy = 'uniform', [-0.25, 0.25]
+priors_ = {"types": [pt_incl, pt_PA, pt_mstar, pt_r_l, pt_z0, pt_psi, pt_T0,
+                     pt_q, pt_Tmaxb, pt_sigV0, pt_Vsys, pt_dx, pt_dy],
+           "pars": [pp_incl, pp_PA, pp_mstar, pp_r_l, pp_z0, pp_psi, pp_T0,
+                    pp_q, pp_Tmaxb, pp_sigV0, pp_Vsys, pp_dx, pp_dy]}
 
 
 gen_msk = True				

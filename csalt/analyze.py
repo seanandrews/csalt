@@ -4,31 +4,77 @@ call this like
 python analyze_emcee.py <filename> <burnin>
 
 """
-import os, sys
+import os, sys, importlib
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-import emcee
-import corner
-from post_summary import post_summary
+import emcee, corner
+from scipy import stats
+sys.path.append('configs_modeling/')
+
+
+def post_summary(p, prec=0.1, mu='peak', CIlevs=[84.135, 15.865, 50.]):
+
+    # calculate percentiles as designated
+    CI_p = np.percentile(p, CIlevs)
+
+    # find peak of posterior
+    if (mu == 'peak'):
+        kde_p = stats.gaussian_kde(p)
+        ndisc = np.int(np.round((CI_p[0] - CI_p[1]) / prec))
+        x_p = np.linspace(CI_p[1], CI_p[0], ndisc)
+        pk_p = x_p[np.argmax(kde_p.evaluate(x_p))]
+    else:
+        pk_p = np.percentile(p, 50.)
+
+    # return the peak and upper, lower 1-sigma
+    return (pk_p, CI_p[0]-pk_p, pk_p-CI_p[1], CI_p[2])
+
+
+
+### Ingest the configuration file (in configs_modeling/). 
+if len(sys.argv) == 1:
+    print('\nSpecify a configuration filename in configs_modeling/ as an '+ \
+          'argument: e.g., \n')
+    print('        python csalt_fit.py <cfg_file>\n')
+    sys.exit()
+else:
+    # Read user-supplied argument
+    cfg_file = sys.argv[1]
+
+    # Strip the '.py' if they included it
+    if cfg_file[-3:] == '.py':
+        cfg_file = cfg_file[:-3]
+
+    # Load the configuration file contents
+    try:
+        inp = importlib.import_module('mconfig_'+cfg_file)
+    except:
+        print('\nThere is a problem with the configuration file:')
+        print('trying to use configs_modeling/mconfig_'+cfg_file+'.py\n')
+        sys.exit()
+
 
 
 # load the emcee backend file
-fname = 'posteriors/'+sys.argv[1]+'.h5'
-reader = emcee.backends.HDFBackend(fname)
+fname = inp.basename+inp._ext+inp._fitnote
+print(fname)
+reader = emcee.backends.HDFBackend('fitting/posteriors/'+fname+'.h5')
+
 
 # parse the samples
 all_samples = reader.get_chain(discard=0, flat=False)
-samples = reader.get_chain(discard=np.int(sys.argv[2]), flat=False)
-samples_ = reader.get_chain(discard=np.int(sys.argv[2]), flat=True)
-logpost_samples = reader.get_log_prob(discard=np.int(sys.argv[2]), flat=False)
-logprior_samples = reader.get_blobs(discard=np.int(sys.argv[2]), flat=False)
+samples = reader.get_chain(discard=inp.burnin, flat=False)
+samples_ = reader.get_chain(discard=inp.burnin, flat=True)
+logpost_samples = reader.get_log_prob(discard=inp.burnin, flat=False)
+logprior_samples = reader.get_blobs(discard=inp.burnin, flat=False)
 nsteps, nwalk, ndim = samples.shape
+
 
 # set parameter labels, truths (NOT HARDCODE!)
 lbls = ['incl', 'PA', 'M', 'r_l', 'z0', 'psi', 'Tb0', 'q', 'Tback', 'dV0', 
         'vsys', 'dx', 'dy']
-theta = [40, 130, 0.7, 200, 2.3, 1.0, 205., 0.5, 20., 347.7, 5200, 0., 0.]
+theta = [40, 130, 0.7, 200, 2.3, 1.0, 205., -0.5, 20., 348., 5200, 0., 0.]
 
 
 # Plot the integrated autocorrelation time every Ntau steps
@@ -51,6 +97,7 @@ theta = [40, 130, 0.7, 200, 2.3, 1.0, 205., 0.5, 20., 347.7, 5200, 0., 0.]
 #    plt.ylim([0, tau_ix.max() + 0.1 * (tau_ix.max() - tau_ix.min())])
 #    fig.savefig('mcmc_analysis/'+sys.argv[1]+'.autocorr.png')
 #    fig.clf()
+
 
 
 # Plot the traces
@@ -103,19 +150,19 @@ for idim in range(ndim):
 
 fig.subplots_adjust(wspace=0.20, hspace=0.05)
 fig.subplots_adjust(left=0.03, right=0.97, bottom=0.05, top=0.99)
-fig.savefig('mcmc_analysis/'+sys.argv[1]+'.traces.png')
+fig.savefig('fitting/mcmc_analysis/'+fname+'.traces.png')
 fig.clf()
 
 
 
-if np.int(sys.argv[2]) > 0:
+if inp.burnin > 0:
 
     # Corner plot to visualize covariances
     levs = 1. - np.exp(-0.5 * (np.arange(3) + 1)**2)
     flat_chain = samples.reshape(-1, ndim)
     fig = corner.corner(flat_chain, plot_datapoints=False, levels=levs, 
                         labels=lbls, truths=theta)
-    fig.savefig('mcmc_analysis/'+sys.argv[1]+'.corner.png')
+    fig.savefig('fitting/mcmc_analysis/'+fname+'.corner.png')
     fig.clf()
 
 

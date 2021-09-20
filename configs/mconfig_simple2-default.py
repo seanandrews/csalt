@@ -57,6 +57,7 @@ chbin = [2]
 vra_fit = [0, 10400]
 vra_cens = None
 max_steps = 3000
+burnin = 0
 
 init_incl  = [20, 60]	
 init_PA    = [100, 160]	
@@ -96,7 +97,7 @@ priors_ = {"types": [pt_incl, pt_PA, pt_mstar, pt_r_l, pt_z0, pt_psi, pt_T0,
 
 
 gen_msk = True				
-gen_img = [True, True, True]		# for data, model, residual
+gen_img = [True, False, False]		# for data, model, residual
 
 # imaging parameters
 chanstart = '0.40km/s'

@@ -57,4 +57,6 @@ def clean_cube(setupname, MSname, imgname, maskname=None):
 
     os.system('rm -rf *.last')
 
+    exportfits(imgname+'.image', imgname+'.image.fits', overwrite=True)
+
     return

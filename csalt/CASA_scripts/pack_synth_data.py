@@ -4,7 +4,7 @@ import numpy as np
 
 # Load configuration file
 fname = sys.argv[-1]
-execfile('configs_synth/sconfig_'+fname+'.py')
+execfile('configs/generate_'+fname+'.py')
 
 
 # Loop through EBs to generate individual (pure, noisy) MS files

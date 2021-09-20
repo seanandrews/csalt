@@ -14,7 +14,7 @@ import scipy.constants as sc
 
 ### Preparations
 # Load configuration file
-execfile('configs_synth/sconfig_'+sys.argv[-2]+'.py')
+execfile('configs/generate_'+sys.argv[-2]+'.py')
 
 # Assign template index and prepare for simulation
 ix = np.int(sys.argv[-1])

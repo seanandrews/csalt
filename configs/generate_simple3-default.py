@@ -7,10 +7,12 @@ import numpy as np
 
 
 # locators
-template_dir = 'obs_templates/'
-storage_dir = 'synth_storage/'
+output_dir = 'storage/'
+template_dir = output_dir+'obs_templates/'
+storage_dir = output_dir+'synth_storage/'
+reduced_dir = output_dir+'data/'
+casalogs_dir = output_dir+'CASA_logs/'
 simobs_dir = '/pool/asha0/casa-release-5.7.2-4.el7/data/alma/simmos/'
-reduced_dir = 'data/'
 
 
 # naming

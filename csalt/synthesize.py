@@ -2,17 +2,17 @@ import os, sys, importlib
 import numpy as np
 from csalt.data_classes import dataset
 from csalt.models import vismodel_full as vm_full
-sys.path.append('configs_synth/')
+sys.path.append('configs/')
 
 
-def synth_data(config_filename):
+def make_data(cfg_file):
 
-    ### Ingest the configuration file (in configs_synth/). 
+    ### Ingest the configuration file (in configs/). 
     try:
-        inp = importlib.import_module('sconfig_'+config_filename)
+        inp = importlib.import_module('generate_'+cfg_file)
     except:
         print('\nThere is a problem with the configuration file:') 
-        print('  trying to use configs_synth/sconfig_'+config_filename+'.py\n')
+        print('  trying to use configs/generate_'+cfg_file+'.py\n')
         sys.exit()
 
 
@@ -30,7 +30,7 @@ def synth_data(config_filename):
     if not os.path.exists(inp.storage_dir+inp.basename):
         os.system('mkdir '+inp.storage_dir)
         os.system('mkdir '+inp.storage_dir+inp.basename)
-    os.system('cp configs_synth/sconfig_'+config_filename+'.py ' + \
+    os.system('cp configs/generate_'+cfg_file+'.py ' + \
               inp.storage_dir+inp.basename)
 
     # Check and setup "reduced" data storage space (if necessary)
@@ -39,18 +39,23 @@ def synth_data(config_filename):
         os.system('mkdir '+inp.reduced_dir)
         os.system('mkdir '+inp.reduced_dir+inp.basename)
 
+    # Check and setup CASA logs repository (if necessary)
+    if inp.casalogs_dir[-1] != '/': inp.casalogs_dir += '/'
+    if not os.path.exists(inp.casalogs_dir):
+        os.system('mkdir '+inp.casalogs_dir)
+
 
     # Loop through simulated observations (i.e., through EBs)
     for EB in range(len(inp.template)):
 
         # Generate the (blank) template (u,v) tracks (with CASA.simobserve)
         # (output MS files stored in obs_templates/)
-        tmp_ = config_filename+'_'+str(EB)
+        tmp_ = cfg_file+'_'+str(EB)
         if EB == 0:
-            os.system('rm -rf ../CASA_logs/gen_template.'+tmp_+'.log')
-        os.system('casa --nologger --logfile ../CASA_logs/'+ \
-                  'gen_template.'+tmp_+'.log -c ' + \
-                  'CASA_scripts/gen_template.py '+config_filename+' '+str(EB))
+            os.system('rm -rf '+inp.casalogs_dir+'/gen_template.'+tmp_+'.log')
+        os.system('casa --nologger --logfile '+inp.casalogs_dir+ \
+                  'gen_template.'+tmp_+'.log -c '+ \
+                  'csalt/CASA_scripts/gen_template.py '+cfg_file+' '+str(EB))
 
 
         # Load the template information into a dataset object
@@ -83,22 +88,22 @@ def synth_data(config_filename):
 
 
     # Pack the data into a single, concatenated MS file (like real data)
-    os.system('rm -rf ../CASA_logs/pack_synth_data.'+config_filename+'.log')
-    os.system('casa --nologger --logfile ../CASA_logs/'+ \
-              'pack_synth_data.'+config_filename+'.log '+ \
-              '-c CASA_scripts/pack_synth_data.py '+config_filename)
+    os.system('rm -rf '+inp.casalogs_dir+'pack_synth_data.'+cfg_file+'.log')
+    os.system('casa --nologger --logfile '+inp.casalogs_dir+ \
+              'pack_synth_data.'+cfg_file+'.log '+ \
+              '-c csalt/CASA_scripts/pack_synth_data.py '+cfg_file)
 
 
 
     # Format the data (+ time-average if desired) 
-    os.system('rm -rf ../CASA_logs/format_data.'+config_filename+'.log')
-    os.system('casa --nologger --logfile ../CASA_logs/'+ \
-              'format_data.'+config_filename+'.log '+ \
-              '-c CASA_scripts/format_data.py configs_synth/sconfig_'+ \
-              config_filename+' pure')
-    os.system('casa --nologger --logfile ../CASA_logs/'+ \
-              'format_data.'+config_filename+'.log '+ \
-              '-c CASA_scripts/format_data.py configs_synth/sconfig_'+ \
-              config_filename+' noisy')
+    os.system('rm -rf '+inp.casalogs_dir+'format_data.'+cfg_file+'.log')
+    os.system('casa --nologger --logfile '+inp.casalogs_dir+ \
+              'format_data.'+cfg_file+'.log '+ \
+              '-c csalt/CASA_scripts/format_data.py configs/generate_'+ \
+              cfg_file+' pure')
+    os.system('casa --nologger --logfile '+inp.casalogs_dir+ \
+              'format_data.'+cfg_file+'.log '+ \
+              '-c csalt/CASA_scripts/format_data.py configs/generate_'+ \
+              cfg_file+' noisy')
 
     return 0

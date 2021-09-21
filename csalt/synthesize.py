@@ -1,6 +1,6 @@
 import os, sys, importlib
 import numpy as np
-from csalt.data_classes import dataset
+from csalt.data import dataset
 from csalt.models import vismodel_full as vm_full
 sys.path.append('configs/')
 

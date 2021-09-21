@@ -1,18 +1,18 @@
 import os, sys, importlib
 import numpy as np
-from csalt.data_classes import dataset
+from csalt.data import dataset
 from csalt.models import vismodel_def as vismodel
-sys.path.append('configs_modeling/')
+sys.path.append('configs/')
 
 
-def dmr(config_filename):
+def dmr(cfg_file):
 
     # Load the configuration file contents
     try:
-        inp = importlib.import_module('mconfig_'+config_filename)
+        inp = importlib.import_module('mconfig_'+cfg_file)
     except:
         print('\nThere is a problem with the configuration file:')
-        print('trying to use configs_modeling/sconfig_'+config_filename+'.py\n')
+        print('trying to use configs/mconfig_'+cfg_file+'.py\n')
         sys.exit()
 
 
@@ -42,9 +42,31 @@ def dmr(config_filename):
 
 
     # convert the model and residual visibilities into MS format
-    os.system('rm -rf ../CASA_logs/process_DMR_'+config_filename+'.log')
+    os.system('rm -rf '+inp.casalogs_dir+'process_dmr_'+cfg_file+'.log')
     os.system('casa --nologger --logfile '+ \
-              '../CASA_logs/process_DMR_'+config_filename+'.log '+ \
-              '-c CASA_scripts/process_DMR.py '+config_filename)
+              inp.casalogs_dir+'process_dmr_'+cfg_file+'.log '+ \
+              '-c csalt/CASA_scripts/process_dmr.py '+cfg_file)
+
+    return 0
+
+
+def img_cube(cfg_file, cubetype='DAT', makemask=True):
+
+    # Load the configuration file contents
+    try:
+        inp = importlib.import_module('mconfig_'+cfg_file)
+    except:
+        print('\nThere is a problem with the configuration file:')
+        print('trying to use configs/mconfig_'+cfg_file+'.py\n')
+        sys.exit()
+
+
+    os.system('rm -rf '+inp.casalogs_dir+'image_cube_'+cfg_file+'.'+ \
+              cubetype+'.log')
+    os.system('casa --nologger --logfile '+ \
+              inp.casalogs_dir+'image_cube_'+cfg_file+'.'+cubetype+'.log '+ \
+              '-c csalt/CASA_scripts/image_cube.py '+\
+              cfg_file+' '+cubetype+' '+ \
+              str(makemask))
 
     return 0

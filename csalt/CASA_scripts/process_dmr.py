@@ -1,10 +1,9 @@
 import os, sys
 import numpy as np
-execfile('CASA_scripts/image_cube.py')
 
 
 # Load configuration file
-execfile('configs_modeling/mconfig_'+sys.argv[-1]+'.py')
+execfile('configs/mconfig_'+sys.argv[-1]+'.py')
 
 
 # load the metadata
@@ -33,26 +32,5 @@ for EB in range(nobs):
     tb.putcol("DATA", m_['resid'])
     tb.close()
 
-
-
-
-# IMAGING
-
-# Make a (Keplerian) mask if requested (or it doesn't already exist)
-if np.logical_or(gen_msk, ~os.path.exists(dataname+_ext+'.mask')):
-    generate_kepmask(sys.argv[-1], dataname+_ext+'_EB0.DAT', 
-                     dataname+_ext+'.DAT')
-
-
-# Image the cubes if requested
-filetype = ['DAT', 'MOD', 'RES']
-for i in range(len(filetype)):
-    if gen_img[i]:
-        files_ = [dataname+_ext+'_EB'+str(j)+'.'+filetype[i]+'.ms' 
-                  for j in range(nobs)]
-        print(sys.argv[-1])
-        print(files_)
-        clean_cube(sys.argv[-1], files_, dataname+_ext+'.'+filetype[i], 
-                   maskname=dataname+'.mask')
 
 os.system('rm -rf *.last')

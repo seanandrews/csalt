@@ -175,3 +175,13 @@ def fitdata(inp, vra=None, vcensor=None):
 
     # return the output dictionary
     return out_dict
+
+
+
+def format_data(cfg_file):
+
+    # Format the data (+ time-average if desired) 
+    os.system('rm -rf '+inp.casalogs_dir+'format_data.'+cfg_file+'.log')
+    os.system('casa --nologger --logfile '+inp.casalogs_dir+ \
+              'format_data.'+cfg_file+'.log '+ \
+              '-c csalt/CASA_scripts/format_data.py configs/mconfig_'+cfg_file)

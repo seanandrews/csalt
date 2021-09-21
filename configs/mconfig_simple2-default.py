@@ -3,26 +3,32 @@
 
 import numpy as np
 
+
+output_dir = 'storage/'
+template_dir = output_dir+'obs_templates/'
+storage_dir = output_dir+'synth_storage/'
+reduced_dir = output_dir+'data/'
+casalogs_dir = output_dir+'CASA_logs/'
+
+
 # naming
 basename = 'simple2-default'
 _ext = '_pure'
 _fitnote = ''
 
-reduced_dir = 'data/'+basename+'/'
-dataname = reduced_dir+basename
-
+dataname = reduced_dir+basename+'/'+basename
 
 # Model parameters
 incl  = 40.
 PA    = 130.
 mstar = 0.7
-r_l   = 200.
+r_l   = 260.    #200.
 z0    = 2.3
 psi   = 1.
-T0    = 205.
+T0    = 125.    #205.
 q     = -0.5
 Tmaxb = 20.
-sigV0 = 348.
+sigV0 = 272.    #348.
 Vsys  = 5.2e3
 dx    = 0.
 dy    = 0.

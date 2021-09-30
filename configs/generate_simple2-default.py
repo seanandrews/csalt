@@ -58,14 +58,14 @@ bounds_pad = 3
 incl  = 40.
 PA    = 130.
 mstar = 0.7
-r_l   = 260.	#200.
-z0    = 2.3
+r_l   = 260.
+z0    = -3.0
 psi   = 1.
-T0    = 125.	#205.
+T0    = 125.	
 q     = -0.5
 Tmaxb = 20.
-sigV0 = 272.	#348.
-Vsys  = 5.2e3
+sigV0 = 272.	
+Vsys  = 0.0e3	#5.2e3
 dx    = 0.
 dy    = 0.
 pars  = np.array([incl, PA, mstar, r_l, z0, psi, T0, q, Tmaxb, 
@@ -73,6 +73,8 @@ pars  = np.array([incl, PA, mstar, r_l, z0, psi, T0, q, Tmaxb,
 
 
 # Fixed parameters
-FOV  = [6.4]		# full field of view (arcsec)
+FOV  = [6.375]		# full field of view (arcsec)
 Npix = [256]  		# number of pixels per FOV
 dist = 150.		# distance (pc)
+
+cfg_dict = {}

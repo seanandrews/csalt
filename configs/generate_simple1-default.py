@@ -76,3 +76,5 @@ pars  = np.array([incl, PA, mstar, r_l, z0, psi, T0, q, Tmaxb,
 FOV  = [6.4]		# full field of view (arcsec)
 Npix = [256]  		# number of pixels per FOV
 dist = 150.		# distance (pc)
+
+cfg_dict = {}

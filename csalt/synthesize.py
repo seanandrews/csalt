@@ -66,7 +66,7 @@ def make_data(cfg_file):
 
 
         # Calculate model visibilities
-        fixed = inp.nu_rest, inp.FOV[EB], inp.Npix[EB], inp.dist
+        fixed = inp.nu_rest, inp.FOV[EB], inp.Npix[EB], inp.dist, inp.cfg_dict
         mvis_p, mvis_n = vm_full(inp.pars, fixed, tmp_dataset, 
                                  oversample=inp.nover, noise_inject=inp.RMS[EB])
 

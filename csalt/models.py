@@ -15,6 +15,64 @@ from scipy.interpolate import interp1d
 import scipy.constants as sc
 from vis_sample.classes import *
 from parametric_disk import *
+from astropy.io import fits
+
+
+def cube_to_fits(sky_image, fitsout, RA=0., DEC=0.):
+
+    # revert to proper formatting
+    cube = np.fliplr(np.rollaxis(sky_image.data, -1))
+
+    # extract coordinate information
+    im_nfreq, im_ny, im_nx = cube.shape
+    pixsize_x = np.abs(np.diff(sky_image.ra)[0])
+    pixsize_y = np.abs(np.diff(sky_image.dec)[0])
+    CRVAL3, CDELT3 = sky_image.freqs[0], np.diff(sky_image.freqs)[0]
+
+    # generate the primary HDU
+    hdu = fits.PrimaryHDU(np.float32(cube))
+
+    # generate the header
+    header = hdu.header
+    header['EPOCH'] = 2000.
+    header['EQUINOX'] = 2000.
+
+    # Latitude and Longitude of the pole of the coordinate system.
+    header['LATPOLE'] = -1.436915713634E+01
+    header['LONPOLE'] = 180.
+
+    # Define the RA coordinate
+    header['CTYPE1'] = 'RA---SIN'
+    header['CUNIT1'] = 'DEG'
+    header['CDELT1'] = -pixsize_x / 3600 
+    header['CRPIX1'] = 0.5 * im_nx + 0.5
+    header['CRVAL1'] = RA
+
+    # Define the DEC coordinate
+    header['CTYPE2'] = 'DEC--SIN'
+    header['CUNIT2'] = 'DEG'
+    header['CDELT2'] = pixsize_y / 3600 
+    header['CRPIX2'] = 0.5 * im_ny + 0.5
+    header['CRVAL2'] = DEC
+
+    # Define the frequency coordiante
+    header['CTYPE3'] = 'FREQ'
+    header['CUNIT3'] = 'Hz'
+    header['CRPIX3'] = 1.
+    header['CDELT3'] = CDELT3
+    header['CRVAL3'] = CRVAL3
+
+    header['SPECSYS'] = 'LSRK'
+    header['VELREF'] = 257
+    header['BSCALE'] = 1.
+    header['BZERO'] = 0.
+    header['BUNIT'] = 'JY/PIXEL'
+    header['BTYPE'] = 'Intensity'
+
+    hdu.writeto(fitsout, overwrite=True)
+
+
+
 
 
 def vismodel_full(pars, fixed, dataset, 
@@ -22,7 +80,7 @@ def vismodel_full(pars, fixed, dataset,
 
     ### - Prepare inputs
     # Parse fixed parameters
-    restfreq, FOV, npix, dist = fixed
+    restfreq, FOV, npix, dist, cfg_dict = fixed
     npars = len(pars)
 
     # Spatial frequencies to lambda units

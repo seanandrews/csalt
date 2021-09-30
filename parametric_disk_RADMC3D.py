@@ -81,8 +81,8 @@ def parametric_disk(velax, pars, pars_fixed, quiet=True):
 
     # Pack the cube into a vis_sample SkyImage object and return
     mod_data = np.fliplr(np.rollaxis(cube, 0, 3))
-    mod_ra  = (FOV / npix) * (np.arange(npix) - 0.5 * npix) 
-    mod_dec = (FOV / npix) * (np.arange(npix) - 0.5 * npix)
+    mod_ra  = (FOV / (npix - 1)) * (np.arange(npix) - 0.5 * npix) 
+    mod_dec = (FOV / (npix - 1)) * (np.arange(npix) - 0.5 * npix)
     freq = restfreq * (1 - velax / sc.c)
 
     return SkyImage(mod_data, mod_ra, mod_dec, freq, None)

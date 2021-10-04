@@ -45,7 +45,7 @@ def parametric_disk(velax, pars, pars_fixed, quiet=True):
 
     # Fixed and adjusted parameters
     dV_q = 0.5 * Tb_q
-    tau_10 = 100.
+    tau_10 = 500.
     tau_q = -1
     Tbmax_f = 1000
     dVmax_f = np.sqrt(2 * sc.k * Tbmax_f / (28 * (sc.m_p + sc.m_e)))
@@ -120,7 +120,7 @@ def parametric_disk(velax, pars, pars_fixed, quiet=True):
     disk.set_vtheta_profile(function=vkep, side='both')
 
 
-    ok = disk.plot_dV_profile()
+    ok = disk.plot_vtheta_profile()
     plt.show()
 
 

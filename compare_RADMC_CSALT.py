@@ -49,7 +49,8 @@ bm = np.abs(np.diff(dx)[0] * np.diff(dy)[0]) * (np.pi / 180)**2 / 3600**2
 
 # display properties
 vmin, vmax = 0., 70.   # these are in Tb / K
-cm = cm.get_cmap('cmr.chroma_r', 10)
+#cm = cm.get_cmap('cmr.chroma_r', 10)
+cm = cm.get_cmap('cmr.amethyst_r', 25)
 xlims = np.array([2., -2.])
 #norm = ImageNormalize(vmin=vmin, vmax=vmax, stretch=AsinhStretch())
 
@@ -80,9 +81,9 @@ for i in range(6):
                      vmin=vmin, vmax=vmax)
 
     axr.plot( xgi * np.cos(PAr) + ygi * np.sin(PAr),
-             -xgi * np.sin(PAr) + ygi * np.cos(PAr), ':r', lw=0.8)
+             -xgi * np.sin(PAr) + ygi * np.cos(PAr), ':k', lw=0.8)
     axc.plot( xgi * np.cos(PAr) + ygi * np.sin(PAr),
-             -xgi * np.sin(PAr) + ygi * np.cos(PAr), ':r', lw=0.8)
+             -xgi * np.sin(PAr) + ygi * np.cos(PAr), ':k', lw=0.8)
 
 
     # modify the styling

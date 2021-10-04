@@ -31,7 +31,7 @@ def parametric_disk(velax, pars, pars_fixed, quiet=True):
     # Parse the inputs
     restfreq, FOV, npix, dist, cfg_dict = pars_fixed
 
-    inc, PA, mstar, r_l, Tmid0, Tatm0, qmid, qatm, hs_T, ws_T, Sigma0_gas, \
+    inc, PA, mstar, r_l, Tmid0, Tatm0, qmid, qatm, hs_p, ws_p, Sigma0_gas, \
         p1, xmol, depl, ab_zrmin, ab_zrmax, ab_rmin, ab_rmax, xi, \
         vlsr, dx, dy = pars
 
@@ -45,8 +45,8 @@ def parametric_disk(velax, pars, pars_fixed, quiet=True):
     # Set up the temperature structure function
     def T_gas(r, z):
         Tmid, Tatm = Tmid0 * (r / r0)**qmid, Tatm0 * (r / r0)**qatm	
-        H_mid = np.sqrt(_k * Tmid / (_mu * _mH))
-        hs_p, ws_p = H_mid * hs_T / r, H_mid * ws_T / r
+        #H_mid = np.sqrt(_k * Tmid / (_mu * _mH))
+        #hs_p, ws_p = H_mid * hs_T / r, H_mid * ws_T / r
         fz = 0.5 * np.tanh(((z / r) - hs_p) / ws_p) + 0.5
         Tout = (Tmid**4 + fz * Tatm**4)**0.25
         return np.clip(Tout, a_min=Tmin, a_max=Tmax)

@@ -269,7 +269,7 @@ def vismodel_iter(pars, fixed, dataset, gcf, corr, imethod='cubic', chpad=3):
 
     ### - Prepare inputs
     # Parse fixed parameters
-    restfreq, FOV, Npix, dist = fixed
+    restfreq, FOV, Npix, dist, cfg_dict = fixed
     npars = len(pars)
 
     # Pad the frequency arrays

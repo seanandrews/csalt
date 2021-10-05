@@ -24,7 +24,7 @@ def dmr(cfg_file):
     for EB in range(data_dict['nobs']):
 
         # set fixed parameters
-        fixed = inp.nu_rest, inp.FOV[EB], inp.Npix[EB], inp.dist
+        fixed = inp.nu_rest, inp.FOV[EB], inp.Npix[EB], inp.dist, inp.cfg_dict
 
         # load dataset
         d_ = np.load(inp.dataname+inp._ext+'_EB'+str(EB)+'.npz')

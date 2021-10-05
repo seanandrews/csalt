@@ -59,17 +59,19 @@ incl  = 40.
 PA    = 130.
 mstar = 0.25
 r_l   = 100.
-z0    = 2.8
+z0    = 3.4
 psi   = 1.
-T0    = 85.
+T0    = 75.
 q     = -0.5
 Tmaxb = 20.
-sigV0 = 224.
-Vsys  = 5.2e3
+sigV0 = 210.
+tau0  = 350.
+p     = -1.
+Vsys  = 0.e3	#5.2e3
 dx    = 0.
 dy    = 0.
 pars  = np.array([incl, PA, mstar, r_l, z0, psi, T0, q, Tmaxb, 
-                  sigV0, Vsys, dx, dy])
+                  sigV0, tau0, p, Vsys, dx, dy])
 
 
 # Fixed parameters

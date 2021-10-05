@@ -1,21 +1,21 @@
 import os, sys, time, importlib
 import numpy as np
-from csalt.data_classes import *
+from csalt.data import *
 from csalt.models import *
 import emcee
 from multiprocessing import Pool
 os.environ["OMP_NUM_THREADS"] = "1"
-sys.path.append('configs_modeling/')
+sys.path.append('configs/')
 
 
-def inference_emcee(config_filename):
+def run_emcee(cfg_file):
 
     # Load the configuration file contents
     try:
-        inp = importlib.import_module('mconfig_'+config_filename)
+        inp = importlib.import_module('mconfig_'+cfg_file)
     except:
         print('\nThere is a problem with the configuration file:')
-        print('trying to use configs_modeling/mconfig_'+config_filename+'.py\n')
+        print('trying to use configs/mconfig_'+cfg_file+'.py\n')
         sys.exit()
 
 
@@ -23,7 +23,7 @@ def inference_emcee(config_filename):
     data_ = fitdata(inp, vra=inp.vra_fit, vcensor=inp.vra_cens)
 
 
-    # set initial parameter guesses
+    # initialize parameters
     p_lo, p_hi = inp.init_[:,0], inp.init_[:,1]
     ndim, nwalk = len(p_lo), inp.nwalkers
     p0 = [np.random.uniform(p_lo, p_hi, ndim) for iw in range(nwalk)]
@@ -33,7 +33,7 @@ def inference_emcee(config_filename):
     for EB in range(data_['nobs']):
 
         # set fixed parameters
-        fixed = inp.nu_rest, inp.FOV[EB], inp.Npix[EB], inp.dist
+        fixed = inp.nu_rest, inp.FOV[EB], inp.Npix[EB], inp.dist, inp.cfg_dict
 
         # initial model calculations
         _mvis, gcf, corr = vismodel_def(p0[0], fixed, data_[str(EB)],
@@ -65,7 +65,7 @@ def inference_emcee(config_filename):
         # loop through parameters
         for ip in range(len(theta)):
             pri_type = inp.priors_['types'][ip]
-            pri_pars = inp.priors_['pars'][inp]
+            pri_pars = inp.priors_['pars'][ip]
             if pri_type == 'uniform':
                 ptheta[ip] = lnp_uniform(theta[ip], pri_pars)
             elif pri_type == 'normal':
@@ -75,7 +75,8 @@ def inference_emcee(config_filename):
 
         return ptheta
 
-    
+
+
     # log-posterior calculator
     def lnprob(theta):
 
@@ -92,13 +93,14 @@ def inference_emcee(config_filename):
             dat = data_[str(EB)]
 
             # calculate model visibilities
-            fixed = inp.nu_rest, inp.FOV[EB], inp.Npix[EB], inp.dist       
-            mvis = vismodel_iter(theta, fixed, dat, 
-                                 data_['gcf'+str(EB)], data_['corr'+str(EB)]) 
+            fixed = inp.nu_rest, inp.FOV[EB], inp.Npix[EB], inp.dist, \
+                    inp.cfg_dict
+            mvis = vismodel_iter(theta, fixed, dat,
+                                 data_['gcf'+str(EB)], data_['corr'+str(EB)])
 
             # spectrally bin the model
             wt = dat.iwgt.reshape((dat.npol, -1, dat.chbin, dat.nvis))
-            mvis_b = np.average(mvis.reshape((dat.npol, -1, dat.chbin, 
+            mvis_b = np.average(mvis.reshape((dat.npol, -1, dat.chbin,
                                               dat.nvis)), weights=wt, axis=2)
 
             # compute the residuals (stack both pols)
@@ -113,15 +115,15 @@ def inference_emcee(config_filename):
 
 
 
-
-    if not os.path.exists('fitting'):
-        os.mkdir('fitting')
-        os.mkdir('fitting/posteriors/')
-
-    # Configure emcee backend
-    post_filename = 'fitting/posteriors/'+inp.basename+inp._ext+inp._fitnote+'.h5'
-    os.system('rm -rf '+post_filename)
-    backend = emcee.backends.HDFBackend(post_filename)
+    # Configure backend for recording posterior samples
+    fitout = inp.fitname+inp.basename+inp._ext+inp._fitnote+'/'
+    if not os.path.exists(fitout):
+        os.mkdir(inp.fitname)
+        os.mkdir(fitout)
+        os.mkdir(fitout+'posteriors/')
+    post_file = fitout+'posteriors/emcee_samples.h5'
+    os.system('rm -rf '+post_file)
+    backend = emcee.backends.HDFBackend(post_file)
     backend.reset(nwalk, ndim)
 
     # run the sampler
@@ -136,4 +138,4 @@ def inference_emcee(config_filename):
     print(' ')
     print('This run took %.2f hours' % ((t1 - t0) / 3600))
 
-    return 0
+    return

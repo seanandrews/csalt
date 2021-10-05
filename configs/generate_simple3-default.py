@@ -58,18 +58,20 @@ bounds_pad = 3
 incl  = 40.
 PA    = 130.
 mstar = 2.0
-r_l   = 700.
-z0    = 2.3
+r_l   = 400.
+z0    = 1.9
 psi   = 1.
-T0    = 200.
+T0    = 180.
 q     = -0.5
 Tmaxb = 20.
-sigV0 = 344.
-Vsys  = 5.2e3
+sigV0 = 326.
+tau0  = 715.
+p     = -1.
+Vsys  = 0.0e3	#5.2e3
 dx    = 0.
 dy    = 0.
 pars  = np.array([incl, PA, mstar, r_l, z0, psi, T0, q, Tmaxb, 
-                  sigV0, Vsys, dx, dy])
+                  sigV0, tau0, p, Vsys, dx, dy])
 
 
 # Fixed parameters

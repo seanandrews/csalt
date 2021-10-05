@@ -24,11 +24,11 @@ dataname = reduced_dir+basename+'/'+basename
 # observation settings
 template = ['lmm']
 config = ['6']
-ttotal = ['20min']
+ttotal = ['30min']
 tinteg = ['30s']
-date = ['2022/07/15']
-HA_0 = ['-0.5h']
-RMS = [3.7]             # desired naturally-weighted RMS in mJy/beam/channel
+date = ['2022/07/11']
+HA_0 = ['-0.25h']
+RMS = [5.3]             # desired naturally-weighted RMS in mJy/beam/channel
 
 
 # spectral settings
@@ -57,19 +57,21 @@ bounds_pad = 3
 # Model parameters
 incl  = 40.
 PA    = 130.
-mstar = 0.25	#0.7
-r_l   = 75.	#200.
-z0    = -2.75
+mstar = 0.7
+r_l   = 200.
+z0    = 2.5
 psi   = 1.
-T0    = 85.	#125.	
+T0    = 115.	
 q     = -0.5
 Tmaxb = 20.
-sigV0 = 224.	#272.	
-Vsys  = 0.0e3	#5.2e3
+sigV0 = 261.	
+tau0  = 500.
+ppp   = -1.
+Vsys  = 5.2e3
 dx    = 0.
 dy    = 0.
 pars  = np.array([incl, PA, mstar, r_l, z0, psi, T0, q, Tmaxb, 
-                  sigV0, Vsys, dx, dy])
+                  sigV0, tau0, ppp, Vsys, dx, dy])
 
 
 # Fixed parameters

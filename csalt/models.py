@@ -71,6 +71,8 @@ def cube_to_fits(sky_image, fitsout, RA=0., DEC=0.):
 
     hdu.writeto(fitsout, overwrite=True)
 
+    return
+
 
 
 
@@ -153,7 +155,7 @@ def vismodel_full(pars, fixed, dataset,
 
         # sample it's Fourier transform on the template (u,v) spacings
         mvis = vis_sample(imagefile=cube, uu=uu[ixl:ixh], vv=vv[ixl:ixh],
-                          mu_RA=pars[11], mu_DEC=pars[12], mod_interp=False).T
+                          mu_RA=pars[-2], mu_DEC=pars[-1], mod_interp=False).T
 
         # populate the results in the output array *for this timestamp only*
         mvis_pure[0,:,ixl:ixh,0] = mvis.real
@@ -204,7 +206,7 @@ def vismodel_def(pars, fixed, dataset,
 
     ### - Prepare inputs
     # Parse fixed parameters
-    restfreq, FOV, Npix, dist = fixed
+    restfreq, FOV, Npix, dist, cfg_dict = fixed
     npars = len(pars)
 
     # Spatial frequencies to lambda units
@@ -233,8 +235,8 @@ def vismodel_def(pars, fixed, dataset,
     mcube = parametric_disk(v_model, pars, fixed)
 
     # sample the FT of the cube onto the observed spatial frequencies
-    mvis, gcf, corr = vis_sample(imagefile=mcube, uu=uu, vv=vv, mu_RA=pars[11], 
-                                 mu_DEC=pars[12], return_gcf=True, 
+    mvis, gcf, corr = vis_sample(imagefile=mcube, uu=uu, vv=vv, mu_RA=pars[-2], 
+                                 mu_DEC=pars[-1], return_gcf=True, 
                                  return_corr_cache=True, mod_interp=False)
     mvis = mvis.T
 
@@ -292,7 +294,7 @@ def vismodel_iter(pars, fixed, dataset, gcf, corr, imethod='cubic', chpad=3):
     mcube = parametric_disk(v_model, pars, fixed)
 
     # sample the FT of the cube onto the observed spatial frequencies
-    mvis = vis_sample(imagefile=mcube, mu_RA=pars[11], mu_DEC=pars[12], 
+    mvis = vis_sample(imagefile=mcube, mu_RA=pars[-2], mu_DEC=pars[-1], 
                       gcf_holder=gcf, corr_cache=corr, mod_interp=False).T
 
     # distribute interpolates to different timestamps

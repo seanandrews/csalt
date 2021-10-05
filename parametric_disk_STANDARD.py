@@ -41,17 +41,15 @@ def parametric_disk(velax, pars, pars_fixed, quiet=True):
     # Parse the inputs
     restfreq, FOV, npix, dist, cfg_dict = pars_fixed
     inc, PA, mstar, r_l, z_10, z_q, Tb_10, Tb_q, Tbmax_b, dV_10, \
-        vlsr, dx, dy = pars
+        tau_10, tau_q, vlsr, dx, dy = pars
 
     # Fixed and adjusted parameters
     dV_q = 0.5 * Tb_q
-    tau_10 = 500.
-    tau_q = -1
     Tbmax_f = 1000
     dVmax_f = np.sqrt(2 * sc.k * Tbmax_f / (28 * (sc.m_p + sc.m_e)))
     dVmax_b = np.sqrt(2 * sc.k * Tbmax_b / (28 * (sc.m_p + sc.m_e)))
     x0, y0 = 0., 0.
-    z_tap, Tb_tap, dV_tap, tau_tap = r_l, r_l, r_l, r_l
+    z_tap, Tb_tap, dV_tap, tau_tap = np.inf, r_l, r_l, r_l
     z_exp, Tb_exp, dV_exp, tau_exp = np.inf, np.inf, np.inf, np.inf
     
 
@@ -118,11 +116,6 @@ def parametric_disk(velax, pars, pars_fixed, quiet=True):
         return vv
 
     disk.set_vtheta_profile(function=vkep, side='both')
-
-
-    ok = disk.plot_vtheta_profile()
-    plt.show()
-
 
     # Build the datacube.
     cube = disk.get_cube(velax=velax, vlsr=vlsr)

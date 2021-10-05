@@ -23,13 +23,13 @@ inpc = importlib.import_module('generate_simple2-default')
 
 # calculate cubes
 fixedr = inpr.nu_rest, inpr.FOV[0], inpr.Npix[0], inpr.dist, inpr.cfg_dict
-#cuber = pardisk_radmc(velax, inpr.pars, fixedr)
+cuber = pardisk_radmc(velax, inpr.pars, fixedr)
 fixedc = inpc.nu_rest, inpc.FOV[0], inpc.Npix[0], inpc.dist, inpc.cfg_dict
 cubec = pardisk_csalt(velax, inpc.pars, fixedc)
 
 
 # create FITS
-#cube_to_fits(cuber, 'cube_radmc.fits', RA=240., DEC=-40.)
+cube_to_fits(cuber, 'cube_radmc.fits', RA=240., DEC=-40.)
 cube_to_fits(cubec, 'cube_csalt.fits', RA=240., DEC=-40.)
 
 
@@ -49,8 +49,8 @@ bm = np.abs(np.diff(dx)[0] * np.diff(dy)[0]) * (np.pi / 180)**2 / 3600**2
 
 # display properties
 vmin, vmax = 0., 70.   # these are in Tb / K
-#cm = cm.get_cmap('cmr.chroma_r', 10)
-cm = cm.get_cmap('cmr.amethyst_r', 25)
+cm = cm.get_cmap('cmr.chroma_r', 10)
+#cm = cm.get_cmap('cmr.amethyst_r', 25)
 xlims = np.array([2., -2.])
 #norm = ImageNormalize(vmin=vmin, vmax=vmax, stretch=AsinhStretch())
 

@@ -17,30 +17,34 @@ _ext = '_pure'
 _fitnote = ''
 
 dataname = reduced_dir+basename+'/'+basename
+fitname = output_dir+'fitting/'
 
 # Model parameters
 incl  = 40.
 PA    = 130.
 mstar = 0.7
-r_l   = 260.    #200.
-z0    = 2.3
+r_l   = 200.
+z0    = 2.5
 psi   = 1.
-T0    = 125.    #205.
+T0    = 115.
 q     = -0.5
 Tmaxb = 20.
-sigV0 = 272.    #348.
+sigV0 = 261. 
+tau0  = 500.
+ppp   = -1.
 Vsys  = 5.2e3
 dx    = 0.
 dy    = 0.
 pars  = np.array([incl, PA, mstar, r_l, z0, psi, T0, q, Tmaxb,
-                  sigV0, Vsys, dx, dy])
+                  sigV0, tau0, ppp, Vsys, dx, dy])
 
 
 # Fixed parameters
 nu_rest = 230.538e9	# spectral line rest frequency (Hz)
-FOV  = [6.4]            # full field of view (arcsec)
+FOV  = [6.375]          # full field of view (arcsec)
 Npix = [256]            # number of pixels per FOV
 dist = 150.             # distance (pc)
+cfg_dict = {}
 
 
 # --------------------
@@ -75,12 +79,14 @@ init_T0    = [150, 250]
 init_q     = [-1., 0.]	
 init_Tmaxb = [10, 40]
 init_sigV0 = [150, 500]	
+init_tau0  = [100, 1000]
+init_ppp   = [-2, 0]
 init_Vsys  = [4.7e3, 5.7e3]
 init_dx    = [-0.1, 0.1]
 init_dy    = [-0.1, 0.1]
 init_ = np.array([init_incl, init_PA, init_mstar, init_r_l, init_z0, init_psi,
-                  init_T0, init_q, init_Tmaxb, init_sigV0, init_Vsys, 
-                  init_dx, init_dy])
+                  init_T0, init_q, init_Tmaxb, init_sigV0, init_tau0, init_ppp,
+                  init_Vsys, init_dx, init_dy])
 nwalkers = 5 * len(pars)
 
 pt_incl, pp_incl = 'uniform', [-90., 90.]
@@ -93,17 +99,19 @@ pt_T0, pp_T0 = 'uniform', [5., 1000.]
 pt_q, pp_q = 'uniform', [-1.5, 0.]
 pt_Tmaxb, pp_Tmaxb = 'uniform', [5., 100.]
 pt_sigV0, pp_sigV0 = 'uniform', [50., 1000.]
+pt_tau0, pp_tau0 = 'uniform', [50., 1200.]
+pt_ppp, pp_ppp = 'uniform', [-2, 0]
 pt_Vsys, pp_Vsys = 'uniform', [4.2e3, 6.2e3]
 pt_dx, pp_dx = 'uniform', [-0.25, 0.25]
 pt_dy, pp_dy = 'uniform', [-0.25, 0.25]
 priors_ = {"types": [pt_incl, pt_PA, pt_mstar, pt_r_l, pt_z0, pt_psi, pt_T0,
-                     pt_q, pt_Tmaxb, pt_sigV0, pt_Vsys, pt_dx, pt_dy],
+                     pt_q, pt_Tmaxb, pt_sigV0, pt_tau0, pt_ppp, 
+                     pt_Vsys, pt_dx, pt_dy],
            "pars": [pp_incl, pp_PA, pp_mstar, pp_r_l, pp_z0, pp_psi, pp_T0,
-                    pp_q, pp_Tmaxb, pp_sigV0, pp_Vsys, pp_dx, pp_dy]}
+                    pp_q, pp_Tmaxb, pp_sigV0, pp_tau0, pp_ppp, 
+                    pp_Vsys, pp_dx, pp_dy]}
 
 
-gen_msk = True				
-gen_img = [True, False, False]		# for data, model, residual
 
 # imaging parameters
 chanstart = '0.40km/s'
@@ -115,5 +123,5 @@ scales = [0, 10, 30, 50]
 gain = 0.1
 niter = 50000
 robust = 2.0
-threshold = '4mJy'
+threshold = '5mJy'
 uvtaper = ''

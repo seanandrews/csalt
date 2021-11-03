@@ -84,7 +84,7 @@ def lnprob(theta):
 
 
 
-def run_emcee(cfg_file):
+def run_emcee(cfg_file, nsteps=1000, append=False):
 
     # Load the configuration file contents
     try:
@@ -99,8 +99,6 @@ def run_emcee(cfg_file):
     # package data for inference purposes
     global data_
     data_ = fitdata(inp, vra=inp.vra_fit, vcensor=inp.vra_cens)
-
-
 
 
     # initialize parameters
@@ -128,21 +126,33 @@ def run_emcee(cfg_file):
     # Configure backend for recording posterior samples
     fitout = inp.fitname+inp.basename+inp._ext+inp._fitnote+'/'
     if not os.path.exists(fitout):
-        os.mkdir(inp.fitname)
+        if not os.path.exists(inp.fitname):
+            os.mkdir(inp.fitname)
         os.mkdir(fitout)
         os.mkdir(fitout+'posteriors/')
     post_file = fitout+'posteriors/emcee_samples.h5'
-    os.system('rm -rf '+post_file)
-    backend = emcee.backends.HDFBackend(post_file)
-    backend.reset(nwalk, ndim)
+    if not append:
+        os.system('rm -rf '+post_file)
+        backend = emcee.backends.HDFBackend(post_file)
+        backend.reset(nwalk, ndim)
+        
+        with Pool() as pool:
+            sampler = emcee.EnsembleSampler(nwalk, ndim, lnprob, pool=pool,
+                                            backend=backend)
+            t0 = time.time()
+            sampler.run_mcmc(p0, nsteps, progress=True)
+        t1 = time.time()
+    else:
+        new_backend = emcee.backends.HDFBackend(post_file)
+        print("Initial size: {0}".format(new_backend.iteration))
 
-    # run the sampler
-    with Pool() as pool:
-        sampler = emcee.EnsembleSampler(nwalk, ndim, lnprob, pool=pool, 
-                                        backend=backend)
-        t0 = time.time()
-        sampler.run_mcmc(p0, inp.max_steps, progress=True)
-    t1 = time.time()
+        with Pool() as pool:
+            new_sampler = emcee.EnsembleSampler(nwalk, ndim, lnprob, pool=pool,
+                                                backend=new_backend)
+            t0 = time.time()
+            new_sampler.run_mcmc(None, nsteps, progress=True)
+        t1 = time.time()
+        print("Final size: {0}".format(new_backend.iteration))
 
     print(' ')
     print(' ')
@@ -171,7 +181,8 @@ def post_summary(p, prec=0.1, mu='peak', CIlevs=[84.135, 15.865, 50.]):
 
 
 
-def post_analysis(cfg_file, burnin=0, autocorr=False, Ntau=200):
+def post_analysis(cfg_file, burnin=0, autocorr=False, Ntau=200, 
+                  corner_plot=True):
 
     # Load the configuration file contents
     try:
@@ -278,7 +289,25 @@ def post_analysis(cfg_file, burnin=0, autocorr=False, Ntau=200):
     fig.clf()
 
 
+    # corner plot
+    if corner_plot:
+        levs = 1. - np.exp(-0.5 * (np.arange(3) + 1)**2)
+        flat_chain = samples.reshape(-1, ndim)
+        fig = corner.corner(flat_chain, plot_datapoints=False, levels=levs,
+                            labels=lbls, truths=theta)
+        fig.savefig(fitout+'corner.png')
+        fig.clf()
 
+
+    # Parameter inferences (1-D marginalized)
+    print(' ')
+    prec = [0.01, 0.01, 0.001, 0.1, 0.01, 0.01, 0.1, 0.001, 0.1, 0.1, 0.01, 
+            0.01, 0.1, 0.0001, 0.0001]
+    for idim in range(ndim):
+        fmt = '{:.'+str(np.abs(np.int(np.log10(prec[idim]))))+'f}'
+        pk, hi, lo, med = post_summary(samples_[:,idim], prec=prec[idim])
+        print((lbls[idim] + ' = '+fmt+' +'+fmt+' / -'+fmt).format(pk, hi, lo))
+    print(' ')
 
 
 

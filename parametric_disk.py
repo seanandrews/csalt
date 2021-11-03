@@ -40,9 +40,10 @@ def parametric_disk(velax, pars, pars_fixed, quiet=True):
     # Parse the inputs
     restfreq, FOV, npix, dist, cfg_dict = pars_fixed
     inc, PA, mstar, r_l, z_10, z_q, Tb_10, Tb_q, Tbmax_b, dV_10, \
-        tau_10, tau_q, vlsr, dx, dy = pars
+        ltau_10, tau_q, vlsr, dx, dy = pars
 
     # Fixed and adjusted parameters
+    tau_10 = 10**ltau_10
     dV_q = 0.5 * Tb_q
     Tbmax_f = 1000
     dVmax_f = np.sqrt(2 * sc.k * Tbmax_f / (28 * (sc.m_p + sc.m_e)))

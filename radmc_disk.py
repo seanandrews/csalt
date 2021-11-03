@@ -4,6 +4,7 @@ import scipy.constants as sc
 from scipy import integrate
 from scipy.interpolate import interp1d
 from astropy.io import ascii
+import matplotlib.pyplot as plt
 import warnings
 
 # constants (in cgs units)
@@ -266,6 +267,7 @@ class radmc_structure:
         self.modelname = cfg_dict["radmcname"]
         self.gridpars = cfg_dict["grid_params"]
         self.setup = cfg_dict["setup_params"]
+        self.do_vprs = cfg_dict["dPdr"]
         self.func_temperature = func_temperature
         self.func_sigma = func_sigma
         self.func_omega = func_omega
@@ -400,12 +402,30 @@ class radmc_structure:
 
     def set_vgas(self, write=True):
         
-        self.vphi = self.func_omega(self.rcyl, self.zcyl) * self.rcyl
+        # rotation
+        vkep2 = (self.func_omega(self.rcyl, self.zcyl) * self.rcyl)**2
 
-        vgas = np.ravel(self.vphi)
-        foos = np.zeros_like(vgas)
+        # pressure
+        if self.do_vprs:
+            P = self.rho_gas * _k * self.temperature / _mH / _mu
+            dP = np.gradient(P, self.rvals, axis=1) * np.sin(self.tt) + \
+                 np.gradient(P, self.tvals, axis=0) * np.cos(self.tt) / self.rr
+            vprs2 = self.rr * np.sin(self.tt) * dP / self.rho_gas
+            vprs2 = np.where(np.isfinite(vprs2), vprs2, 0.0)
+        else:
+            vprs2 = 0.
+
+        # self-gravity
+        vsg2 = 0.
+
+        # combined azimuthal velocity profile
+        vtot2 = vkep2 + vprs2 + vsg2
+        vtot2[vtot2 < 0] = 0.
+        self.vphi = np.sqrt(vtot2)
 
         if write:
+            vgas = np.ravel(self.vphi)
+            foos = np.zeros_like(vgas)
             np.savetxt(self.modelname+'/gas_velocity.inp',
                        list(zip(foos, foos, vgas)),
                        fmt='%.6e', header=self.hdr, comments='')

@@ -32,14 +32,12 @@ def parametric_disk(velax, pars, pars_fixed, quiet=True):
     restfreq, FOV, npix, dist, cfg_dict = pars_fixed
 
     inc, PA, mstar, r_l, Tmid0, Tatm0, qmid, qatm, hs_p, ws_p, Sigma0_gas, \
-        p1, xmol, depl, ab_zrmin, ab_zrmax, ab_rmin, ab_rmax, xi, \
+        p1, p2, xmol, depl, ab_zrmin, ab_zrmax, ab_rmin, ab_rmax, xi, \
         vlsr, dx, dy = pars
 
     # Fixed and adjusted parameters
     r0 = 10 * _AU
-    p2 = np.inf
     Tmin, Tmax = 5., 1500.
-    
 
 
     # Set up the temperature structure function
@@ -68,6 +66,12 @@ def parametric_disk(velax, pars, pars_fixed, quiet=True):
     # Set up the nonthermal line-width function (NEEDS WORK!)
     def nonthermal_linewidth(r, z):
         return np.zeros_like(r) 
+
+
+    # Compute and quote the total gas mass
+    r_test = np.logspace(-1, 3.5, 2048) * _AU
+    M_gas = np.trapz(2 * np.pi * r_test * Sigma_gas(r_test), r_test) / _msun
+    print('Gas mass of disk = %.4f Msun' % M_gas)
 
 
     # Compute disk structure

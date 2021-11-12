@@ -1,37 +1,62 @@
+"""
+    This CASA script takes the "raw" synthetic data stored in individual HDF5 
+    files (one for each EB) and packs them into two concatenated MSs (one for 
+    the "pure" [noise-free] case, and one for the "noisy" case).  You would 
+    probably never execute it outside of csalt.synthesize.make_data(), but if 
+    did it would be done as
+
+        execfile('pack_synth_data.py <cfg_file>')
+
+    where <cfg_file> is the relevant part of the configuration input filename 
+    (i.e., configs/gen_<cfg_file>.py).
+
+    The script will output ...
+
+"""
 import os, sys
 import numpy as np
+import h5py
 
 
-# Load configuration file
-fname = sys.argv[-1]
-execfile('configs/generate_'+fname+'.py')
+"""
+    Load information and prepare for reading / packaging
+"""
+# Parse the argument
+cfg_file = sys.argv[-1]
 
+# Load the configuration file
+execfile('configs/gen_'+cfg_file+'.py')
 
 # Loop through EBs to generate individual (pure, noisy) MS files
-if storage_dir[-1] != '/': storage_dir += '/'
+if synthraw_dir[-1] != '/': synthraw_dir += '/'
 if template_dir[-1] != '/': template_dir += '/'
 pure_files, noisy_files = [], []
 for EB in range(len(template)):
 
     # Load the data for this EB
-    dat = np.load(storage_dir+basename+'/'+basename+'_EB'+str(EB)+'.npz')
-    data_pure, data_noisy = dat['data_pure'], dat['data_noisy']
-    weights = dat['weights']
+    dfile = synthraw_dir+basename+'/'+basename+'_EB'+str(EB)+'.h5'
+    dat = h5py.File(dfile, "r")
+    data_pure = np.asarray(dat["mvis_pure_real"]) + \
+                1.0j*np.asarray(dat["mvis_pure_imag"])
+    data_noisy = np.asarray(dat["mvis_noisy_real"]) + \
+                 1.0j*np.asarray(dat["mvis_noisy_imag"])
+    weights = np.asarray(dat["weights"])
+    dat.close()
 
-    # Copy the MS file into pure, noisy MS copies (still "blank")
-    _MS = storage_dir+basename+'/'+basename+'_EB'+str(EB)
+    # Copy the blank (template) MS into pure, noisy MS duplicates
+    _MS = synthraw_dir+basename+'/'+basename+'_EB'+str(EB)
     os.system('rm -rf '+_MS+'.*.ms*')
     os.system('cp -r '+template_dir+template[EB]+'.ms '+_MS+'.pure.ms')
     os.system('cp -r '+template_dir+template[EB]+'.ms '+_MS+'.noisy.ms')
 
-    # Pack the "pure" MS table
+    # Pack the data into the "pure" MS table
     tb.open(_MS+'.pure.ms', nomodify=False)
     tb.putcol("DATA", data_pure)
     tb.putcol("WEIGHT", weights)
     tb.flush()
     tb.close()
 
-    # Pack the "noisy" MS table
+    # Pack the data into the "noisy" MS table
     tb.open(_MS+'.noisy.ms', nomodify=False)
     tb.putcol("DATA", data_noisy)
     tb.putcol("WEIGHT", weights)
@@ -43,26 +68,27 @@ for EB in range(len(template)):
     noisy_files += [_MS+'.noisy.ms']
 
 
-# Concatenate MS files
-os.system('rm -rf '+storage_dir+basename+'/'+basename+'_pure.ms*')
-os.system('rm -rf '+storage_dir+basename+'/'+basename+'_noisy.ms*')
+# Concatenate the MS files
+os.system('rm -rf '+synthraw_dir+basename+'/'+basename+'_pure.ms*')
+os.system('rm -rf '+synthraw_dir+basename+'/'+basename+'_noisy.ms*')
 if len(template) > 1:
     concat(vis=pure_files, 
-           concatvis=storage_dir+basename+'/'+fname+'_pure.ms',
+           concatvis=synthraw_dir+basename+'/'+cfg_file+'_pure.ms',
            dirtol='0.1arcsec', copypointing=False)
     concat(vis=noisy_files,
-           concatvis=storage_dir+basename+'/'+fname+'_noisy.ms',
+           concatvis=synthraw_dir+basename+'/'+cfg_file+'_noisy.ms',
            dirtol='0.1arcsec', copypointing=False)
 else:
-    os.system('cp -r '+pure_files[0]+' '+storage_dir+basename+'/'+ \
-              fname+'_pure.ms')
-    os.system('cp -r '+noisy_files[0]+' '+storage_dir+basename+'/'+ \
-              fname+'_noisy.ms')
-
+    os.system('cp -r '+pure_files[0]+' '+synthraw_dir+basename+'/'+ \
+              cfg_file+'_pure.ms')
+    os.system('cp -r '+noisy_files[0]+' '+synthraw_dir+basename+'/'+ \
+              cfg_file+'_noisy.ms')
 
 # Cleanup 
 for EB in range(len(pure_files)):
     os.system('rm -rf '+pure_files[EB])
     os.system('rm -rf '+noisy_files[EB])
-os.system('rm -rf '+storage_dir+basename+'/'+basename+'_EB*npz')
+    os.system('rm -rf '+template_dir+template[EB]+'.ms*')
+    os.system('rm -rf '+template_dir+template[EB]+'.h5')
+os.system('rm -rf '+synthraw_dir+basename+'/'+basename+'_EB*npz')
 os.system('rm -rf *.last')

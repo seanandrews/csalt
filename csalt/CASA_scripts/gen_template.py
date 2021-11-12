@@ -46,7 +46,7 @@ simobserve(project=template[ix]+'.sim', skymodel='../dummy.image',
            antennalist=simobs_dir+'alma.cycle7.'+config[ix]+'.cfg',
            totaltime=ttotal[ix], integration=tinteg[ix], thermalnoise='', 
            indirection='J2000 '+RA+' '+DEC, refdate=date[ix], 
-           hourangle=HA_0[ix], incell='0.02arcsec', mapsize='10arcsec', 
+           hourangle=HA_0[ix], incell='0.02arcsec', mapsize='7arcsec', 
            incenter=str(nu_tune/1e9)+'GHz', 
            inwidth=str(dnu_native[ix] * 1e-3)+'kHz', outframe='TOPO')
 os.system('rm -rf *.last')

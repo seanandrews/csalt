@@ -1,11 +1,11 @@
 import os, sys, importlib
 import numpy as np
 from csalt.data import dataset
-from csalt.models import vismodel_full as vm_full
+from csalt.models import vismodel_full, vismodel_def
 sys.path.append('configs/')
 
 
-def make_data(cfg_file):
+def make_data(cfg_file, mtype='simple'):
 
     ### Ingest the configuration file (in configs/). 
     try:
@@ -67,9 +67,13 @@ def make_data(cfg_file):
 
         # Calculate model visibilities
         fixed = inp.nu_rest, inp.FOV[EB], inp.Npix[EB], inp.dist, inp.cfg_dict
-        mvis_p, mvis_n = vm_full(inp.pars, fixed, tmp_dataset, 
-                                 oversample=inp.nover, noise_inject=inp.RMS[EB])
-
+        if mtype == 'simple':
+            mvis_p, mvis_n = vismodel_full(inp.pars, fixed, tmp_dataset, 
+                                           oversample=inp.nover, 
+                                           noise_inject=inp.RMS[EB])
+        else:
+            mvis_p, mvis_n = vismodel_def(inp.pars, fixed, tmp_dataset,
+                                          noise_inject=inp.RMS[EB])
 
         # Calculate model weights
         sigma_out = 1e-3 * inp.RMS[EB] * \

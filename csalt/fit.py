@@ -54,7 +54,7 @@ def lnprob(theta):
         return -np.inf, -np.inf
 
     # loop through observations to compute the log-likelihood
-    lnpost = 0
+    lnL = 0
     for EB in range(data_['nobs']):
 
         # get the inference dataset
@@ -76,7 +76,7 @@ def lnprob(theta):
         var = np.hstack(dat.wgt)
 
         # compute the log-likelihood
-        lnL = -0.5 * np.tensordot(resid, np.dot(dat.inv_cov, var * resid))
+        lnL += -0.5 * np.tensordot(resid, np.dot(dat.inv_cov, var * resid))
 
     # return the log-posterior and log-prior
     return lnL + dat.lnL0 + lnT, lnT

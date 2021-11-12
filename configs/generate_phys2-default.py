@@ -72,7 +72,7 @@ ws_T  = 0.005
 
 p1 = -1.0
 p2 = 2.0
-Sigma0_gas = 15.
+Sigma0_gas = 150.
 
 xmol = 1e-5
 depl = 1e-10
@@ -97,8 +97,8 @@ dist = 150.		# distance (pc)
 
 
 # instantiate RADMC-3D parameters
-grid_params = { 'spatial': {'nr': 256, 'nt': 128, 'r_min': 0.1, 'r_max': 500 },
-                'cyl': { 'nr': 2048, 'nt': 2048, 'r_min': 0.1, 'r_max': 500,
+grid_params = { 'spatial': {'nr': 256, 'nt': 128, 'r_min': 0.1, 'r_max': 1000 },
+                'cyl': { 'nr': 2048, 'nt': 2048, 'r_min': 0.1, 'r_max': 1000,
                          'z_min': 0.001, 'z_max': 500 } }
 
 setup_params = { 'incl_dust': 0, 'incl_lines': 1, 'nphot': 10000000, 
@@ -108,4 +108,4 @@ setup_params = { 'incl_dust': 0, 'incl_lines': 1, 'nphot': 10000000,
 
 cfg_dict = {'radmcname': radmcname, 
             'grid_params': grid_params, 'setup_params': setup_params,
-            'dPdr': False}
+            'dPdr': False, 'selfgrav': False}

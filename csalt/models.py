@@ -15,7 +15,9 @@ from scipy.interpolate import interp1d
 import scipy.constants as sc
 from vis_sample.classes import *
 from parametric_disk import *
-from astropy.io import fits
+from astropy.io import fits, ascii
+
+_pc = 3.09e18
 
 
 def cube_to_fits(sky_image, fitsout, RA=0., DEC=0.):
@@ -64,6 +66,7 @@ def cube_to_fits(sky_image, fitsout, RA=0., DEC=0.):
 
     header['SPECSYS'] = 'LSRK'
     header['VELREF'] = 257
+    header['RESTFREQ'] = 345.7959899e9
     header['BSCALE'] = 1.
     header['BZERO'] = 0.
     header['BUNIT'] = 'JY/PIXEL'
@@ -74,6 +77,45 @@ def cube_to_fits(sky_image, fitsout, RA=0., DEC=0.):
     return
 
 
+def radmc_to_fits(path_to_image, fitsout, pars_fixed):
+
+    # parse fixed parameters
+    restfreq, FOV, npix, dist, cfg_dict = pars_fixed
+
+    # load the output into a proper cube array
+    imagefile = open(path_to_image+'/image.out')
+    iformat = imagefile.readline()
+    im_nx, im_ny = imagefile.readline().split() #npixels along x and y axes
+    im_nx, im_ny = np.int(im_nx), np.int(im_ny)
+    nlam = np.int(imagefile.readline())
+
+    pixsize_x, pixsize_y = imagefile.readline().split() #pixel sizes in cm 
+    pixsize_x = np.float(pixsize_x)
+    pixsize_y = np.float(pixsize_y)
+
+    imvals = ascii.read(path_to_image+'/image.out', format='fast_csv',
+                        guess=False, data_start=4,
+                        fast_reader={'use_fast_converter':True})['1']
+    lams = imvals[:nlam]
+
+    # erg cm^-2 s^-1 Hz^-1 str^-1 --> Jy / pixel
+    cube = np.reshape(imvals[nlam:],[nlam, im_ny, im_nx])
+    cube *= 1e23 * pixsize_x * pixsize_y / (dist * _pc)**2
+
+    # Pack the cube into a vis_sample SkyImage object and FITS file
+    mod_data = np.fliplr(np.rollaxis(cube, 0, 3))
+    mod_ra  = (FOV / (npix - 1)) * (np.arange(npix) - 0.5 * npix)
+    mod_dec = (FOV / (npix - 1)) * (np.arange(npix) - 0.5 * npix)
+    freq = sc.c / (lams * 1e-6)
+
+    #print(mod_data.shape)
+    #sys.exit()
+
+    skyim = SkyImage(mod_data, mod_ra, mod_dec, freq[::-1], None)
+    foo = cube_to_fits(skyim, fitsout, 240., -40.)
+
+    return 
+    
 
 
 
@@ -199,10 +241,9 @@ def vismodel_full(pars, fixed, dataset,
 
 
 
-
-
 def vismodel_def(pars, fixed, dataset, 
-                 imethod='cubic', return_holders=False, chpad=3):
+                 imethod='cubic', return_holders=False, chpad=3, 
+                 noise_inject=None):
 
     ### - Prepare inputs
     # Parse fixed parameters
@@ -234,6 +275,9 @@ def vismodel_def(pars, fixed, dataset,
     # generate a model cube
     mcube = parametric_disk(v_model, pars, fixed)
 
+    # save a FITS version of the cube
+    cube_to_fits(mcube, 'tmp_cube.fits', RA=240., DEC=-40.) 
+
     # sample the FT of the cube onto the observed spatial frequencies
     mvis, gcf, corr = vis_sample(imagefile=mcube, uu=uu, vv=vv, mu_RA=pars[-2], 
                                  mu_DEC=pars[-1], return_gcf=True, 
@@ -248,20 +292,58 @@ def vismodel_def(pars, fixed, dataset,
                         fill_value='extrapolate')
         mvis[:,ixl:ixh] = fint(v_grid[itime,:])
 
+    ### - Configure noise (if necessary)
+    if noise_inject is not None:
+        # Scale input RMS for desired (naturally-weighted) noise per vis-chan
+        sigma_out = 1e-3 * noise_inject * np.sqrt(dataset.npol * dataset.nvis)
+        sigma_noise = sigma_out #* np.sqrt(np.pi)
+
+        # Random Gaussian noise draws
+        noise = np.random.normal(0, sigma_noise, 
+                                 (mvis.shape[0], dataset.nvis, 2))
+        noise = np.squeeze(noise)
+        
     # convolve with the SRF
     SRF_kernel = np.array([0, 0.25, 0.5, 0.25, 0])
     mvis_re = convolve1d(mvis.real, SRF_kernel, axis=0, mode='nearest')
     mvis_im = convolve1d(mvis.imag, SRF_kernel, axis=0, mode='nearest')
     mvis = mvis_re + 1.0j*mvis_im
-    mvis = mvis[chpad:-chpad,:]
-
-    # populate both polarizations
-    mvis = np.tile(mvis, (2, 1, 1))
 
     # return the dataset after replacing the visibilities with the model
     if return_holders:
+        # remove pads
+        mvis = mvis[chpad:-chpad,:]
+        
+        # populate both polarizations
+        mvis = np.tile(mvis, (2, 1, 1))
+
         return mvis, gcf, corr
+
+    elif noise_inject is not None:
+        # inject noise before SRF convolution 
+        noisy_re = convolve1d(mvis.real + noise[:,:,0], SRF_kernel,
+                              axis=0, mode='nearest')
+        noisy_im = convolve1d(mvis.imag + noise[:,:,1], SRF_kernel,
+                              axis=0, mode='nearest')
+        noisy_mvis = noisy_re + 1.0j*noisy_im
+
+        # remove pads
+        mvis = mvis[chpad:-chpad,:]
+        noisy_mvis = noisy_mvis[chpad:-chpad,:]
+      
+        # populate both polarizations
+        mvis = np.tile(mvis, (2, 1, 1))
+        noisy_mvis = np.tile(noisy_mvis, (2, 1, 1))
+
+        return mvis, noisy_mvis
+        
     else:
+        # remove pads
+        mvis = mvis[chpad:-chpad,:]
+        
+        # populate both polarizations
+        mvis = np.tile(mvis, (2, 1, 1))
+
         return mvis
 
 

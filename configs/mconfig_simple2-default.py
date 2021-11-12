@@ -13,8 +13,8 @@ casalogs_dir = output_dir+'CASA_logs/'
 
 # naming
 basename = 'simple2-default'
-_ext = '_pure'
-_fitnote = '_noCOV'
+_ext = '_noisy'
+_fitnote = ''
 
 dataname = reduced_dir+basename+'/'+basename
 fitname = output_dir+'fitting/'

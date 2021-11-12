@@ -3,6 +3,7 @@ import numpy as np
 import scipy.constants as sc
 from scipy import integrate
 from scipy.interpolate import interp1d
+from scipy.special import ellipk, ellipe
 from astropy.io import ascii
 import matplotlib.pyplot as plt
 import warnings
@@ -268,6 +269,7 @@ class radmc_structure:
         self.gridpars = cfg_dict["grid_params"]
         self.setup = cfg_dict["setup_params"]
         self.do_vprs = cfg_dict["dPdr"]
+        self.do_vsg = cfg_dict["selfgrav"]
         self.func_temperature = func_temperature
         self.func_sigma = func_sigma
         self.func_omega = func_omega
@@ -416,7 +418,22 @@ class radmc_structure:
             vprs2 = 0.
 
         # self-gravity
-        vsg2 = 0.
+        if self.do_vsg:
+            rp = np.logspace(np.log10(self.rvals[0]), 
+                             np.log10(3*self.rvals[-1]), 4096)
+            kk = 4 * rp[None,:] * self.rcyl[:,:,None] / \
+                 ((self.rcyl[:,:,None] + rp[None,:])**2 + \
+                  self.zcyl[:,:,None]**2)
+            br = ellipk(np.sqrt(kk)) - 0.25 * (kk / (1. - kk)) * \
+                 ((rp[None,:] / self.rcyl[:,:,None]) - \
+                  (self.rcyl[:,:,None] / rp[None,:]) + \
+                  (self.zcyl[:,:,None]**2/(self.rcyl[:,:,None]*rp[None,:]))) * \
+                 ellipe(np.sqrt(kk))
+            integ = br * np.sqrt(rp[None,:] / self.rcyl[:,:,None]) * \
+                    np.sqrt(kk) * self.func_sigma(rp[None,:])
+            vsg2 = _G * np.trapz(integ, rp, axis=-1)
+        else:
+            vsg2 = 0.
 
         # combined azimuthal velocity profile
         vtot2 = vkep2 + vprs2 + vsg2

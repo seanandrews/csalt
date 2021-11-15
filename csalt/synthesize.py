@@ -170,4 +170,4 @@ def make_data(cfg_file, mtype='csalt', make_raw_FITS=True):
               '-c csalt/CASA_scripts/format_data.py configs/generate_'+ \
               cfg_file+' noisy')
 
-    return 0
+    return 

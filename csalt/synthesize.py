@@ -6,7 +6,7 @@
 import os, sys, importlib
 import numpy as np
 import h5py
-from csalt.data import dataset
+from csalt.data import dataset, HDF_to_dataset, dataset_to_HDF
 from csalt.models import vismodel_full, vismodel_def
 sys.path.append('configs/')
 
@@ -81,9 +81,7 @@ def check_setups(cfg_file):
 
 
 
-
-
-def make_data(cfg_file, mtype='csalt', make_raw_FITS=True):
+def make_template(cfg_file):
 
     # Run checks on the setups and load the configuration file inputs
     inp = check_setups(cfg_file)
@@ -98,17 +96,27 @@ def make_data(cfg_file, mtype='csalt', make_raw_FITS=True):
                   'gen_template.'+tmp_+'.log -c '+ \
                   'csalt/CASA_scripts/gen_template.py '+cfg_file+' '+str(EB))
 
-        # Load the template information into a dataset object
-        tmp = h5py.File(inp.template_dir+inp.template[EB]+'.h5', "r")
-        tmp_um, tmp_vm = np.asarray(tmp['um']), np.asarray(tmp['vm'])
-        tmp_vis = np.asarray(tmp['vis_real'])+1.0j*np.asarray(tmp['vis_imag'])
-        tmp_wgts = np.asarray(tmp['weights'])
-        tmp_TOPO = np.asarray(tmp['nu_TOPO'])
-        tmp_LSRK = np.asarray(tmp['nu_LSRK'])
-        tmp_stmp = np.asarray(tmp['tstamp_ID'])
-        tmp_dataset = dataset(tmp_um, tmp_vm, tmp_vis, tmp_wgts, 
-                              tmp_TOPO, tmp_LSRK, tmp_stmp)
-        tmp.close()
+    return
+
+
+
+
+def make_data(cfg_file, mtype='csalt', new_template=True):
+
+    # Run checks on the setups and load the configuration file inputs
+    inp = check_setups(cfg_file)
+
+    # Make the (blank) template observations (if requested or necessary)
+    tfiles = [inp.template_dir+i+'.h5' for i in inp.template]
+    if np.logical_or(new_template,
+                     not np.all([os.path.exists(f) for f in tfiles])):
+        make_template(cfg_file)
+
+    # Make data in loop over Execution Blocks (EBs)
+    for EB in range(len(inp.template)):
+
+        # Load the template from HDF5 into a dataset object
+        tmp_dataset = HDF_to_dataset(inp.template_dir+inp.template[EB])
 
         # Calculate the model visibilities in pure (p) and noisy (n) cases
         fixed = inp.nu_rest, inp.FOV[EB], inp.Npix[EB], inp.dist, inp.cfg_dict
@@ -125,30 +133,16 @@ def make_data(cfg_file, mtype='csalt', make_raw_FITS=True):
                     np.sqrt(tmp_dataset.npol * tmp_dataset.nvis)
         mwgt = np.sqrt(1 / sigma_out) * np.ones_like(tmp_dataset.wgt)
 
-        # Store "raw" synthetic data in HDF5 format (for each EB)
-        # (e.g., this can have a larger vel range / no time-averaging, etc., 
-        #  that we may want to have on-hand without fully re-generating it)
+        # Populate "pure" and "noisy" datasets
+        pure_dataset, noisy_dataset = tmp_dataset, tmp_dataset
+        pure_dataset.vis, noisy_dataset.vis = mvis_p, mvis_n
+        pure_dataset.wgt, noisy_dataset.wgt = mwgt, mwgt
+
+        # Store "raw" synthetic data ("pure" and "noisy") in HDF5 
         hdf_out = inp.synthraw_dir+inp.basename+'/'+inp.basename+'_EB'+str(EB)
-        os.system('rm -rf '+hdf_out+'.h5')
-        outp = h5py.File(hdf_out+'.h5', "w")
-        outp.create_dataset("um", tmp_um.shape, dtype='float64')[:] = tmp_um
-        outp.create_dataset("vm", tmp_vm.shape, dtype='float64')[:] = tmp_vm
-        outp.create_dataset("mvis_pure_real", mvis_p.shape, 
-                            dtype="float64")[:,:,:] = mvis_p.real
-        outp.create_dataset("mvis_pure_imag", mvis_p.shape, 
-                            dtype="float64")[:,:,:] = mvis_p.imag
-        outp.create_dataset("mvis_noisy_real", mvis_n.shape, 
-                            dtype="float64")[:,:,:] = mvis_n.real
-        outp.create_dataset("mvis_noisy_imag", mvis_n.shape, 
-                            dtype="float64")[:,:,:] = mvis_n.imag
-        outp.create_dataset("weights", mwgt.shape, dtype="float64")[:,:] = mwgt
-        outp.create_dataset("nu_TOPO", tmp_TOPO.shape, 
-                            dtype="float64")[:] = tmp_TOPO
-        outp.create_dataset("nu_LSRK", tmp_LSRK.shape, 
-                            dtype="float64")[:,:] = tmp_LSRK
-        outp.create_dataset("tstamp_ID", tmp_stmp.shape, 
-                            dtype="float64")[:] = tmp_stmp
-        outp.close()
+        os.system('rm -rf '+hdf_out+'.*.h5')
+        dataset_to_HDF(pure_dataset, hdf_out+'.pure')
+        dataset_to_HDF(noisy_dataset, hdf_out+'.noisy')
 
 
     # Pack these outputs into "raw", concatenated MS files (like real data)
@@ -157,17 +151,15 @@ def make_data(cfg_file, mtype='csalt', make_raw_FITS=True):
               'pack_synth_data.'+cfg_file+'.log '+ \
               '-c csalt/CASA_scripts/pack_synth_data.py '+cfg_file)
 
-    sys.exit()
-
     # Format the data into "reduced" form (+ time-average if desired) 
     os.system('rm -rf '+inp.casalogs_dir+'format_data.'+cfg_file+'.log')
     os.system('casa --nologger --logfile '+inp.casalogs_dir+ \
               'format_data.'+cfg_file+'.log '+ \
-              '-c csalt/CASA_scripts/format_data.py configs/generate_'+ \
+              '-c csalt/CASA_scripts/format_data.py configs/gen_'+ \
               cfg_file+' pure')
     os.system('casa --nologger --logfile '+inp.casalogs_dir+ \
               'format_data.'+cfg_file+'.log '+ \
-              '-c csalt/CASA_scripts/format_data.py configs/generate_'+ \
+              '-c csalt/CASA_scripts/format_data.py configs/gen_'+ \
               cfg_file+' noisy')
 
     return 

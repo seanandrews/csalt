@@ -34,12 +34,14 @@ pure_files, noisy_files = [], []
 for EB in range(len(template)):
 
     # Load the data for this EB
-    dfile = synthraw_dir+basename+'/'+basename+'_EB'+str(EB)+'.h5'
-    dat = h5py.File(dfile, "r")
-    data_pure = np.asarray(dat["mvis_pure_real"]) + \
-                1.0j*np.asarray(dat["mvis_pure_imag"])
-    data_noisy = np.asarray(dat["mvis_noisy_real"]) + \
-                 1.0j*np.asarray(dat["mvis_noisy_imag"])
+    dfile = synthraw_dir+basename+'/'+basename+'_EB'+str(EB)
+
+    dat = h5py.File(dfile+'.pure.h5', "r")
+    data_pure = np.asarray(dat["vis_real"]) + 1j * np.asarray(dat["vis_imag"])
+    dat.close()
+
+    dat = h5py.File(dfile+'.noisy.h5', "r")
+    data_noisy = np.asarray(dat["vis_real"]) + 1j * np.asarray(dat["vis_imag"])
     weights = np.asarray(dat["weights"])
     dat.close()
 
@@ -88,7 +90,6 @@ else:
 for EB in range(len(pure_files)):
     os.system('rm -rf '+pure_files[EB])
     os.system('rm -rf '+noisy_files[EB])
-    os.system('rm -rf '+template_dir+template[EB]+'.ms*')
-    os.system('rm -rf '+template_dir+template[EB]+'.h5')
-os.system('rm -rf '+synthraw_dir+basename+'/'+basename+'_EB*npz')
+    #os.system('rm -rf '+template_dir+template[EB]+'.ms*')
+    #os.system('rm -rf '+template_dir+template[EB]+'.h5')
 os.system('rm -rf *.last')

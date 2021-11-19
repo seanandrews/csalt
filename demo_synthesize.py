@@ -27,5 +27,12 @@
 '''
 
 from csalt.synthesize import make_data
+from csalt.dmr import dmr, img_cube
 
 make_data('simple-demo', mtype='csalt', make_raw_FITS=True)
+
+dmr('simple-demo', mtype='csalt', make_raw_FITS=True)
+
+img_cube('simple-demo', cubetype='DATA', mask_name=None)
+
+

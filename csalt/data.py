@@ -1,5 +1,6 @@
 import os, sys, importlib
 import numpy as np
+import h5py
 import scipy.constants as sc
 
 # General visibility dataset object
@@ -175,6 +176,61 @@ def fitdata(inp, vra=None, vcensor=None):
 
     # return the output dictionary
     return out_dict
+
+
+
+
+def HDF_to_dataset(HDF_in):
+
+    # Open the HDF file
+    _ = h5py.File(HDF_in+'.h5', "r")
+
+    # Load the inputs into numpy arrays (convert visibilities to complex)
+    _um, _vm = np.asarray(_['um']), np.asarray(_['vm'])
+    _vis = np.asarray(_['vis_real']) + 1j * np.asarray(_['vis_imag'])
+    _wgts, _stmp = np.asarray(_['weights']), np.asarray(_['tstamp_ID'])
+    _TOPO, _LSRK = np.asarray(_['nu_TOPO']), np.asarray(_['nu_LSRK'])
+    _.close()
+
+    # Return a dataset object
+    return dataset(_um, _vm, _vis, _wgts, _TOPO, _LSRK, _stmp)
+
+
+
+
+def dataset_to_HDF(dataset_in, HDF_out, append=False, groupname=None):
+
+    # Check output kwargs
+    if append:
+        if not os.path.exists(HDF_out+'.h5'):
+            print('The HDF5 file you are trying to append does not exist.')
+            return
+        elif groupname == None:
+            print('You need to specify a groupname to append in the HDF file.')
+            return
+        else:
+            if groupname[-1] != '/': groupname += '/'
+
+        outp = h5py.File(HDF_out+'.h5', "a")
+    else:
+        groupname = ''
+        os.system('rm -rf '+HDF_out+'.h5')
+        outp = h5py.File(HDF_out+'.h5', "w")
+
+    # Populate the file
+    outp.create_dataset(groupname+'um', data=dataset_in.um)
+    outp.create_dataset(groupname+'vm', data=dataset_in.vm)
+    outp.create_dataset(groupname+'vis_real', data=dataset_in.vis.real)
+    outp.create_dataset(groupname+'vis_imag', data=dataset_in.vis.imag)
+    outp.create_dataset(groupname+'weights', data=dataset_in.wgt)
+    outp.create_dataset(groupname+'nu_TOPO', data=dataset_in.nu_TOPO)
+    outp.create_dataset(groupname+'nu_LSRK', data=dataset_in.nu_LSRK)
+    outp.create_dataset(groupname+'tstamp_ID', data=dataset_in.tstamp)
+    outp.close()
+
+    return
+
+
 
 
 

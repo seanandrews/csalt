@@ -33,47 +33,59 @@ casalogs_dir = outputbase_dir+'CASA_logs/'
 # path to CASA/simobserve-format antenna configuration files
 antcfg_dir = '/pool/asha0/casa-release-5.7.2-4.el7/data/alma/simmos/'
 
-
-# naming
+# datafile naming base
 basename = 'simple-demo'
+
+# synthetic "raw" naming base
 in_MS = synthraw_dir+basename+'/'+basename
+
+# synthetic "reduced" naming base
 dataname = reduced_dir+basename+'/'+basename
 
 
-# observation settings
-template = ['lmm']
-config = ['alma.cycle8.6']	# has a .cfg ending!
-ttotal = ['2min']
-tinteg = ['30s']
-date = ['2022/07/11']
-HA_0 = ['-0.25h']
-RMS = [5.3]             # desired naturally-weighted RMS in mJy/beam/channel
 
+"""
+    SIMULATED OBSERVATION SETTINGS:
+
+"""
+# array observing settings
+template = ['exo12m-lo', 'exo12m-hi']		# template names 
+config = ['alma.cycle8.3', 'alma.cycle8.6']	# antenna location lists 
+date = ['2022/04/20', '2022/07/11']		# observation dates (UTC)
+HA_0 = ['-0.25h', '0.0h']			# HAs at observing starts
+ttotal = ['2min', '5min']			# total on-source times
+tinteg = ['30s', '30s']				# integration times per stamp
 
 # spectral settings
-dnu_native = [122.0703125 * 1e3]    # native channel spacing (Hz)
-nu_rest = 230.538e9	            # rest frequency (Hz)
-V_tune  = [4.0e3]	# LSRK velocity tuning for central channel (m/s)
-V_span  = [15.0e3]	# +/- velocity width around vtune for simulation (m/s)
-nover = 3	# spectral over-sampling factor (for SRF convolution)
-
+dnu_native = [122070.3125, 122070.3125]		# native channel spacings (Hz)
+nu_rest = 345.7959899e9                		# rest frequency (Hz)
+V_tune  = [4.0e3, 4.0e3]       			# LSRK tunings at centers (m/s)
+V_span  = [15.0e3, 15.0e3]      		# +/- ranges around V_tune (m/s)
+nover = 1       				# over-sampling factor (for SRF)
 
 # spatial settings
-RA   = '16:00:00.00'	# phase center RA
-DEC  = '-40:00:00.00'	# phase center DEC
-RA_pieces = [np.float(RA.split(':')[i]) for i in np.arange(3)]
-RAdeg = 15 * np.sum(np.array(RA_pieces) / [1., 60., 3600.])
-DEC_pieces = [np.float(DEC.split(':')[i]) for i in np.arange(3)]
-DECdeg = np.sum(np.array(DEC_pieces) / [1., 60., 3600.])
+RA = '16:00:00.00'    				# phase center RA
+DEC = '-40:00:00.00'   				# phase center DEC
+
+# noise model settings
+RMS = [10.3, 5.4]  				# desired RMS (mJy/beam/chan)
 
 
-# reduction settings
-tavg = ['']
-V_bounds = [(5.2 - 10)*1e3, (5.2 + 10)*1e3]
-bounds_pad = 3
+
+"""
+    DATA REDUCTION SETTINGS:
+
+"""
+tavg = ['', '']					# time-averaging intervals
+V_bounds = [5.2e3-5e3, 5.2e3+5e3]		# excised V_LSRK range (m/s)
 
 
-# Model parameters
+
+"""
+    INPUT MODEL PARAMETERS:
+
+"""
+# parametric_model inputs
 incl  = 40.
 PA    = 130.
 mstar = 0.7
@@ -84,18 +96,29 @@ T0    = 115.
 q     = -0.5
 Tmaxb = 20.
 sigV0 = 261.	
-tau0  = 500.
+ltau0  = np.log10(500.)
 ppp   = -1.
 Vsys  = 5.2e3
 dx    = 0.
 dy    = 0.
 pars  = np.array([incl, PA, mstar, r_l, z0, psi, T0, q, Tmaxb, 
-                  sigV0, tau0, ppp, Vsys, dx, dy])
+                  sigV0, ltau0, ppp, Vsys, dx, dy])
+
+# fixed inputs
+FOV  = [6.375, 6.375]				# full FOV (arcsec)
+Npix = [256, 256]  				# number of pixels per FOV
+						# note: pixsize = FOV/(Npix-1)
+dist = 150.					# distance (pc)
+cfg_dict = {}					# passable dictionary of kwargs
 
 
-# Fixed parameters
-FOV  = [6.375]		# full field of view (arcsec)
-Npix = [256]  		# number of pixels per FOV
-dist = 150.		# distance (pc)
 
-cfg_dict = {}
+
+"""
+    ADDITIONAL MISCELLANY:
+"""
+# process phase center into degrees
+RA_pieces = [np.float(RA.split(':')[i]) for i in np.arange(3)]
+RAdeg = 15 * np.sum(np.array(RA_pieces) / [1., 60., 3600.])
+DEC_pieces = [np.float(DEC.split(':')[i]) for i in np.arange(3)]
+DECdeg = np.sum(np.array(DEC_pieces) / [1., 60., 3600.])

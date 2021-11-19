@@ -7,7 +7,7 @@
     Outputs:
 	- various
 """
-import os, sys
+import os, sys, time
 import numpy as np
 from vis_sample import vis_sample
 from scipy.ndimage import convolve1d
@@ -173,7 +173,7 @@ def vismodel_full(pars, fixed, dataset,
         sigma_out = 1e-3 * noise_inject * np.sqrt(dataset.npol * dataset.nvis)
 
         # Scale to account for spectral oversampling and SRF convolution
-        sigma_noise = sigma_out * np.sqrt(np.pi * oversample)
+        sigma_noise = sigma_out * np.sqrt(oversample * 8./3.)
 
         # Random Gaussian noise draws: note RE/IM separated for speed later
         noise = np.random.normal(0, sigma_noise, 
@@ -183,7 +183,8 @@ def vismodel_full(pars, fixed, dataset,
 
     ### - Compute the model visibilities
     # Loop through timestamps to get raw (sky) visibilities
-    mvis_pure = np.squeeze(np.empty((dataset.npol, nch, dataset.nvis, 2)))
+    mvis_ = np.squeeze(np.empty((dataset.npol, nch, dataset.nvis, 2)))
+    t0 = time.time()
     for itime in range(dataset.nstamps):
         # track the steps
         print('timestamp '+str(itime+1)+' / '+str(dataset.nstamps))
@@ -200,18 +201,21 @@ def vismodel_full(pars, fixed, dataset,
                           mu_RA=pars[-2], mu_DEC=pars[-1], mod_interp=False).T
 
         # populate the results in the output array *for this timestamp only*
-        mvis_pure[0,:,ixl:ixh,0] = mvis.real
-        mvis_pure[1,:,ixl:ixh,0] = mvis.real
-        mvis_pure[0,:,ixl:ixh,1] = mvis.imag
-        mvis_pure[1,:,ixl:ixh,1] = mvis.imag
-
+        mvis_[0,:,ixl:ixh,0] = mvis.real
+        mvis_[1,:,ixl:ixh,0] = mvis.real
+        mvis_[0,:,ixl:ixh,1] = mvis.imag
+        mvis_[1,:,ixl:ixh,1] = mvis.imag
+    print('time to make this == ', (time.time()-t0) / 60.)
 
     # Convolve with the spectral response function
     # (truncated at a 40 dB power drop for computational speed)
-    chix = np.arange(25 * oversample) / oversample
-    xch = chix - np.mean(chix)
-    SRF = 0.5 * np.sinc(xch) + 0.25 * np.sinc(xch-1) + 0.25 * np.sinc(xch+1)
-    mvis_pure = convolve1d(mvis_pure, SRF/np.sum(SRF), axis=1, mode='nearest')
+    if oversample > 1:
+        chix = np.arange(25 * oversample) / oversample
+        xch = chix - np.mean(chix)
+        SRF = 0.5*np.sinc(xch) + 0.25*np.sinc(xch-1) + 0.25*np.sinc(xch+1)
+    else:
+        SRF = np.array([0.0, 0.25, 0.50, 0.25, 0.0])
+    mvis_pure = convolve1d(mvis_, SRF/np.sum(SRF), axis=1, mode='nearest')
 
     # Return decimated visibilities, with noise if necessary
     if noise_inject is None:
@@ -223,7 +227,7 @@ def vismodel_full(pars, fixed, dataset,
         return mvis_pure[:,:,:,0] + 1j * mvis_pure[:,:,:,1]
     else:
         # SRF convolution of noisy data
-        mvis_noisy = convolve1d(mvis_pure + noise, SRF/np.sum(SRF), 
+        mvis_noisy = convolve1d(mvis_ + noise, SRF/np.sum(SRF), 
                                 axis=1, mode='nearest')
 
         # Decimate
@@ -279,34 +283,35 @@ def vismodel_def(pars, fixed, dataset,
     cube_to_fits(mcube, 'tmp_cube.fits', RA=240., DEC=-40.) 
 
     # sample the FT of the cube onto the observed spatial frequencies
-    mvis, gcf, corr = vis_sample(imagefile=mcube, uu=uu, vv=vv, mu_RA=pars[-2], 
-                                 mu_DEC=pars[-1], return_gcf=True, 
-                                 return_corr_cache=True, mod_interp=False)
-    mvis = mvis.T
+    mvis_, gcf, corr = vis_sample(imagefile=mcube, uu=uu, vv=vv, 
+                                  mu_RA=pars[-2], mu_DEC=pars[-1], 
+                                  return_gcf=True, return_corr_cache=True, 
+                                  mod_interp=False)
+    mvis_ = mvis_.T
 
     # distribute interpolates to different timestamps
     for itime in range(dataset.nstamps):
         ixl = np.min(np.where(dataset.tstamp == itime))
         ixh = np.max(np.where(dataset.tstamp == itime)) + 1
-        fint = interp1d(v_model, mvis[:,ixl:ixh], axis=0, kind=imethod, 
+        fint = interp1d(v_model, mvis_[:,ixl:ixh], axis=0, kind=imethod, 
                         fill_value='extrapolate')
-        mvis[:,ixl:ixh] = fint(v_grid[itime,:])
+        mvis_[:,ixl:ixh] = fint(v_grid[itime,:])
 
     ### - Configure noise (if necessary)
     if noise_inject is not None:
         # Scale input RMS for desired (naturally-weighted) noise per vis-chan
         sigma_out = 1e-3 * noise_inject * np.sqrt(dataset.npol * dataset.nvis)
-        sigma_noise = sigma_out #* np.sqrt(np.pi)
+        sigma_noise = sigma_out * np.sqrt(8./3.)
 
         # Random Gaussian noise draws
         noise = np.random.normal(0, sigma_noise, 
-                                 (mvis.shape[0], dataset.nvis, 2))
+                                 (mvis_.shape[0], dataset.nvis, 2))
         noise = np.squeeze(noise)
         
     # convolve with the SRF
     SRF_kernel = np.array([0, 0.25, 0.5, 0.25, 0])
-    mvis_re = convolve1d(mvis.real, SRF_kernel, axis=0, mode='nearest')
-    mvis_im = convolve1d(mvis.imag, SRF_kernel, axis=0, mode='nearest')
+    mvis_re = convolve1d(mvis_.real, SRF_kernel, axis=0, mode='nearest')
+    mvis_im = convolve1d(mvis_.imag, SRF_kernel, axis=0, mode='nearest')
     mvis = mvis_re + 1.0j*mvis_im
 
     # return the dataset after replacing the visibilities with the model
@@ -321,9 +326,9 @@ def vismodel_def(pars, fixed, dataset,
 
     elif noise_inject is not None:
         # inject noise before SRF convolution 
-        noisy_re = convolve1d(mvis.real + noise[:,:,0], SRF_kernel,
+        noisy_re = convolve1d(mvis_.real + noise[:,:,0], SRF_kernel,
                               axis=0, mode='nearest')
-        noisy_im = convolve1d(mvis.imag + noise[:,:,1], SRF_kernel,
+        noisy_im = convolve1d(mvis_.imag + noise[:,:,1], SRF_kernel,
                               axis=0, mode='nearest')
         noisy_mvis = noisy_re + 1.0j*noisy_im
 

@@ -85,16 +85,9 @@ for EB in range(nEB):
           keepflags=False)
 
 
-# Create a data dictionary
-#data_dict = {'nobs': nEB, 
-#             'original_MS': in_MS, 
-#             'V_bounds_V': V_bounds,
-#             'tavg': tavg}
-#np.save(dataname, data_dict)
-#
 # Create an HDF5 file, and populate the top-level group with basic info
-os.system('rm -rf '+dataname+_ext+'.h5')
-f = h5py.File(dataname+_ext+'.h5', "w")
+os.system('rm -rf '+dataname+_ext+'.DATA.h5')
+f = h5py.File(dataname+_ext+'.DATA.h5', "w")
 f.attrs["nobs"] = nEB
 f.attrs["original_MS"] = in_MS+'.ms'
 f.attrs["V_bounds"] = V_bounds
@@ -142,6 +135,19 @@ for EB in range(nEB):
     else:
         chlo, chhi = chshi.min(), chslo.max()	
 
+
+    print(' ')
+
+    # Set channel pads around data of interest
+    bp_def = 3
+    lo_bp, hi_bp = chlo - bp_def, len(nu_TOPO_all) - chhi - bp_def - 1
+    if np.logical_and((lo_bp >= bp_def), (hi_bp >= bp_def)):
+        bounds_pad = bp_def
+    elif np.logical_or((lo_bp <= 0), (hi_bp <= 0)):
+        bounds_pad = 0
+    else:
+        bounds_pad = np.min([lo_bp, hi_bp])
+
     # Slice out the data of interest
     nu_TOPO = nu_TOPO_all[chlo-bounds_pad:chhi+bounds_pad+1]
     nu_LSRK = nu_LSRK_all[:,chlo-bounds_pad:chhi+bounds_pad+1]
@@ -152,25 +158,21 @@ for EB in range(nEB):
         wgt = wgt_all
 
     # Pack the data into the HDF5 output file
-    f = h5py.File(dataname+_ext+'.h5', "a")
-    f.create_dataset("EB"+str(EB)+"/um", u.shape)[:] = u
-    f.create_dataset("EB"+str(EB)+"/vm", v.shape)[:] = v
-    f.create_dataset("EB"+str(EB)+"/data_re", data.shape)[:,:,:] = data.real
-    f.create_dataset("EB"+str(EB)+"/data_im", data.shape)[:,:,:] = data.imag
-    f.create_dataset("EB"+str(EB)+"/weights", wgt.shape)[:,:] = wgt
-    f.create_dataset("EB"+str(EB)+"/tstamp_ID", tstamp_ID.shape)[:] = tstamp_ID
-    f.create_dataset("EB"+str(EB)+"/nu_TOPO", nu_TOPO.shape)[:] = nu_TOPO
-    f.create_dataset("EB"+str(EB)+"/nu_LSRK", nu_LSRK.shape)[:,:] = nu_LSRK
+    f = h5py.File(dataname+_ext+'.DATA.h5', "a")
+    f.create_dataset('EB'+str(EB)+'/um', data=u)
+    f.create_dataset('EB'+str(EB)+'/vm', data=v)
+    f.create_dataset('EB'+str(EB)+'/vis_real', data=data.real)
+    f.create_dataset('EB'+str(EB)+'/vis_imag', data=data.imag)
+    f.create_dataset('EB'+str(EB)+'/weights', data=wgt)
+    f.create_dataset('EB'+str(EB)+'/nu_TOPO', data=nu_TOPO)
+    f.create_dataset('EB'+str(EB)+'/nu_LSRK', data=nu_LSRK)
+    f.create_dataset('EB'+str(EB)+'/tstamp_ID', data=tstamp_ID)
     f.close()
-    #os.system('rm -rf '+dataname+_ext+'_EB'+str(EB)+'.npz')
-    #np.savez_compressed(dataname+_ext+'_EB'+str(EB), data=data, um=u, vm=v, 
-    #                    weights=wgt, tstamp_ID=tstamp_ID, 
-    #                    nu_TOPO=nu_TOPO, nu_LSRK=nu_LSRK)
 
     # Split off a MS with the "reduced" data from this EB
     if not os.path.exists(reduced_dir+basename+'/subMS'):
         os.system('mkdir '+reduced_dir+basename+'/subMS')
-    sub_ = reduced_dir+basename+'/subMS/'+basename+_ext+'_EB'+str(EB)+'.DAT.ms'
+    sub_ = reduced_dir+basename+'/subMS/'+basename+_ext+'_EB'+str(EB)+'.DATA.ms'
     os.system('rm -rf '+sub_)
     spwtag = '0:'+str(chlo-bounds_pad)+'~'+str(chhi+bounds_pad)
     split(vis=dataname+'_tmp'+str(EB)+'.ms', outputvis=sub_,
@@ -179,12 +181,12 @@ for EB in range(nEB):
 
 
 # Concatenate the MS files
-os.system('rm -rf '+dataname+_ext+'.ms')
+os.system('rm -rf '+dataname+_ext+'.DATA.ms')
 if len(concat_files) > 1:
-    concat(vis=concat_files, concatvis=dataname+_ext+'.ms', dirtol='0.1arcsec',
-           copypointing=False)
+    concat(vis=concat_files, concatvis=dataname+_ext+'.DATA.ms', 
+           dirtol='0.1arcsec', copypointing=False)
 else:
-    os.system('cp -r '+concat_files[0]+' '+dataname+_ext+'.ms')
+    os.system('cp -r '+concat_files[0]+' '+dataname+_ext+'.DATA.ms')
 
 
 # Cleanup

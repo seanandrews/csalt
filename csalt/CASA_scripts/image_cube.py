@@ -3,11 +3,13 @@ import numpy as np
 execfile('/home/sandrews/mypy/keplerian_mask/keplerian_mask.py')
 
 
-def generate_kepmask(setupname, MSname, imgname):
+def generate_kepmask(cfg_file, MSname, imgname):
 
-    execfile('configs/mconfig_'+setupname+'.py')
+    execfile('configs/mdl_'+cfg_file+'.py')
 
     # make a dirty image cube to guide the mask
+    ext = ['.image', '.mask', '.model', '.pb', '.psf', '.residual', '.sumwt']
+    [os.system('rm -rf '+imgname+'.dirty'+j) for j in ext]
     tclean(vis=MSname+'.ms', imagename=imgname+'.dirty', specmode='cube',
            start=chanstart, width=chanwidth, nchan=nchan_out,
            outframe='LSRK', veltype='radio', restfreq=str(nu_rest/1e9)+'GHz',
@@ -20,31 +22,32 @@ def generate_kepmask(setupname, MSname, imgname):
               mstar=mstar, dist=dist, vlsr=Vsys, zr=z0 / 10,
               r_max=1.2 * r_l / dist, nbeams=1.5)
 
-    # cleanup
-    os.system('rm -rf '+dataname+'.mask')
-    os.system('mv '+imgname+'.dirty.mask.image '+dataname+'.mask')
+    # store this as a 'default' mask to avoid repeated calls
+    out_mask_name = img_dir+basename+'.default.mask'
+    os.system('rm -rf '+out_mask_name)
+    os.system('mv '+imgname+'.dirty.mask.image '+ out_mask_name)
 
+    # cleanup
     ext = ['.image', '.mask', '.model', '.pb', '.psf', '.residual', '.sumwt']
     [os.system('rm -rf '+imgname+'.dirty'+j) for j in ext]
-
     os.system('rm -rf *.last')
 
-    return
+    return out_mask_name
 
 
-def clean_cube(setupname, MSname, imgname, maskname=None):
 
-    execfile('configs/mconfig_'+setupname+'.py')
+def clean_cube(cfg_file, MSname, imgname, mask_name=None):
+
+    execfile('configs/mdl_'+cfg_file+'.py')
 
     # if necessary, make a mask
-    if maskname is None:
+    if mask_name is None:
         foo = generate_kepmask(MSname, imgname)
-        maskname = imgname+'.dirty.mask.image'
+        mask_name = img_dir+basename+'.default.mask'
 
     # remove lingering files from previous runs
     ext = ['.image', '.mask', '.model', '.pb', '.psf', '.residual', '.sumwt']
-    for j in ext:
-        os.system('rm -rf '+imgname+j)
+    [os.system('rm -rf '+imgname+j) for j in ext]
 
     # make a clean image cube
     tclean(vis=MSname, imagename=imgname, specmode='cube', datacolumn='data',
@@ -53,10 +56,13 @@ def clean_cube(setupname, MSname, imgname, maskname=None):
            imsize=imsize, cell=cell, deconvolver='multiscale', scales=scales,
            gain=gain, niter=niter, nterms=1, interactive=False,
            weighting='briggs', robust=robust, uvtaper=uvtaper,
-           threshold=threshold, mask=maskname, restoringbeam='common')
+           threshold=threshold, mask=mask_name, restoringbeam='common')
 
+    # export image and mask to FITS
     exportfits(imgname+'.image', imgname+'.image.fits', overwrite=True)
+    exportfits(imgname+'.mask', imgname+'.mask.fits', overwrite=True)
 
+    # cleanup
     os.system('rm -rf *.last')
 
     return
@@ -64,20 +70,16 @@ def clean_cube(setupname, MSname, imgname, maskname=None):
 
 
 
-# Load configuration file
-execfile('configs/mconfig_'+sys.argv[-3]+'.py')
-data_dict = np.load(dataname+'.npy', allow_pickle=True).item()
-nEB = data_dict['nobs']
+cfg_file, cubetype, mask_name = sys.argv[-3:]
 
+# Load configuration file
+execfile('configs/mdl_'+cfg_file+'.py')
 
 # Make a (Keplerian) mask if requested (or it doesn't already exist)
-if np.logical_or(sys.argv[-1] == 'True', not os.path.exists(dataname+'.mask')):
-    generate_kepmask(sys.argv[-3], dataname+_ext+'_EB0.DAT', 
-                     dataname+_ext+'.DAT')
+if np.logical_or(mask_name == 'None', not os.path.exists(mask_name)):
+    mask_ = generate_kepmask(cfg_file, dataname+_ext+'.'+cubetype, 
+                             img_dir+basename+_ext+'.'+cubetype)
 
-
-
-# Image the cubes if requested
-files_ = [dataname+_ext+'_EB'+str(j)+'.'+sys.argv[-2]+'.ms' for j in range(nEB)]
-clean_cube(sys.argv[-3], files_, dataname+_ext+'.'+sys.argv[-2], 
-           maskname=dataname+'.mask')
+# Image the cube
+clean_cube(cfg_file, dataname+_ext+'.'+cubetype+'.ms', 
+           img_dir+basename+_ext+'.'+cubetype, mask_name=mask_)

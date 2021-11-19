@@ -17,11 +17,9 @@ import os, sys
 import numpy as np
 import scipy.constants as sc
 import h5py
+execfile('csalt/CASA_scripts/ms_to_hdf5.py')
 
 
-"""
-    Load information and prepare to generate simulation.
-"""
 # Parse the arguments
 cfg_file, EB = sys.argv[-2], np.int(sys.argv[-1])
 
@@ -39,11 +37,6 @@ t0 = au.lstToUT(au.hoursToHMS(RAdeg / 15 + np.float((HA_0[EB])[:-1])), date[EB])
 dt = t0[0][:-3].replace('-', '/').replace(' ','/')
 nu_tune = au.restToTopo(nu_rest, 1e-3 * V_tune[EB], dt, RA, DEC)
 
-
-"""
-    Make the template (u, v) tracks (based on a "dummy" cube), as placeholders 
-    for the real model (injected in the csalt.synthesize.make_data() module).
-"""
 # Generate a dummy cube
 dummy = ia.makearray(v=0.001, shape=[64, 64, 4, nch])  
 res = ia.fromarray(outfile='dummy.image', pixels=dummy, overwrite=True)
@@ -66,50 +59,8 @@ os.system('rm -rf '+template[EB]+'.ms*')
 sim_MS = 'sims/'+template[EB]+'.sim/'+template[EB]+'.sim.'+config[EB]+'.ms'
 os.system('mv '+sim_MS+' '+template[EB]+'.ms')
 
-
-"""
-    Extract the relevant information from the template measurement set and 
-    record it (in HDF5 format) for easier use in csalt infrastructure.
-"""
-# Acquire MS information (for easier use external to CASA)
-tb.open(template[EB]+'.ms')
-data = np.squeeze(tb.getcol("DATA"))
-u, v = tb.getcol('UVW')[0,:], tb.getcol('UVW')[1,:]
-weights = tb.getcol('WEIGHT')
-times = tb.getcol("TIME")
-tb.close()
-
-# Index the timestamps
-tstamps = np.unique(times)
-tstamp_ID = np.empty_like(times)
-for istamp in range(len(tstamps)):
-    tstamp_ID[times == tstamps[istamp]] = istamp
-
-# Acquire the TOPO frequency channels (Hz)
-tb.open(template[EB]+'.ms/SPECTRAL_WINDOW')
-nu_TOPO = np.squeeze(tb.getcol('CHAN_FREQ'))
-tb.close()
-
-# Compute the LSRK frequencies (Hz) for each timestamp
-nu_LSRK = np.empty((len(tstamps), len(nu_TOPO)))
-ms.open(template[EB]+'.ms')
-for istamp in range(len(tstamps)):
-    nu_LSRK[istamp,:] = ms.cvelfreqs(mode='channel', outframe='LSRK',
-                                     obstime=str(tstamps[istamp])+'s')
-ms.close()
-
-# Record the results in HDF5 format
-os.system('rm -rf '+template[EB]+'.h5')
-outp = h5py.File(template[EB]+'.h5', "w")
-outp.create_dataset("um", u.shape, dtype="float64")[:] = u
-outp.create_dataset("vm", v.shape, dtype="float64")[:] = v
-outp.create_dataset("vis_real", data.shape, dtype="float64")[:,:,:] = data.real
-outp.create_dataset("vis_imag", data.shape, dtype="float64")[:,:,:] = data.imag
-outp.create_dataset("weights", weights.shape, dtype="float64")[:,:] = weights
-outp.create_dataset("nu_TOPO", nu_TOPO.shape, dtype="float64")[:] = nu_TOPO
-outp.create_dataset("nu_LSRK", nu_LSRK.shape, dtype="float64")[:,:] = nu_LSRK
-outp.create_dataset("tstamp_ID", tstamp_ID.shape, dtype="int")[:] = tstamp_ID
-outp.close()
+# Write MS file contents out to HDF5 format
+ms_to_hdf5(template[EB], template[EB])
 
 # Clean up
 os.system('rm -rf dummy.image')

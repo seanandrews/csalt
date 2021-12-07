@@ -25,9 +25,16 @@ import h5py
     Parse inputs and load relevant information.
 """
 # Ingest input arguments
+bounds_ingest = False
 if len(sys.argv) == 3:
     cfg_file = sys.argv[-1]
     _ext = ''
+elif len(sys.argv) == 6:
+    cfg_file = sys.argv[-4]
+    _ext = '_'+sys.argv[-3]
+    Vbounds_lo = np.float(sys.argv[-2])
+    Vbounds_hi = np.float(sys.argv[-1])
+    bounds_ingest = True
 else:
     cfg_file = sys.argv[-2]
     _ext = '_'+sys.argv[-1]
@@ -38,6 +45,11 @@ if os.path.exists(cfg_file+'.py'):
 else:
     print('Could not find input configuration file!')
     sys.exit()
+if bounds_ingest:
+    V_bounds = np.array([Vbounds_lo, Vbounds_hi])
+print(' ')
+print(V_bounds)
+print(' ')
 
 # Make sure outdir exists
 if reduced_dir[-1] != '/': reduced_dir += '/'

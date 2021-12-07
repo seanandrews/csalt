@@ -13,6 +13,7 @@ from vis_sample import vis_sample
 from scipy.ndimage import convolve1d
 from scipy.interpolate import interp1d
 import scipy.constants as sc
+import matplotlib.pyplot as plt
 from vis_sample.classes import *
 from parametric_disk import *
 from astropy.io import fits, ascii
@@ -307,49 +308,47 @@ def vismodel_def(pars, fixed, dataset,
         noise = np.random.normal(0, sigma_noise, 
                                  (mvis_.shape[0], dataset.nvis, 2))
         noise = np.squeeze(noise)
+        noise = noise[:,:,0] + 1j * noise[:,:,1]
         
     # convolve with the SRF
     SRF_kernel = np.array([0, 0.25, 0.5, 0.25, 0])
-    mvis_re = convolve1d(mvis_.real, SRF_kernel, axis=0, mode='nearest')
-    mvis_im = convolve1d(mvis_.imag, SRF_kernel, axis=0, mode='nearest')
-    mvis = mvis_re + 1.0j*mvis_im
+    p_mvis = convolve1d(mvis_.real, SRF_kernel, axis=0, mode='nearest') + \
+             1j*convolve1d(mvis_.imag, SRF_kernel, axis=0, mode='nearest')
 
     # return the dataset after replacing the visibilities with the model
     if return_holders:
         # remove pads
-        mvis = mvis[chpad:-chpad,:]
+        p_mvis = p_mvis[chpad:-chpad,:]
         
         # populate both polarizations
-        mvis = np.tile(mvis, (2, 1, 1))
+        p_mvis = np.tile(p_mvis, (2, 1, 1))
 
-        return mvis, gcf, corr
+        return p_mvis, gcf, corr
 
     elif noise_inject is not None:
         # inject noise before SRF convolution 
-        noisy_re = convolve1d(mvis_.real + noise[:,:,0], SRF_kernel,
-                              axis=0, mode='nearest')
-        noisy_im = convolve1d(mvis_.imag + noise[:,:,1], SRF_kernel,
-                              axis=0, mode='nearest')
-        noisy_mvis = noisy_re + 1.0j*noisy_im
+        mvis_ += noise
+        n_mvis = convolve1d(mvis_.real, SRF_kernel, axis=0, mode='nearest') + \
+                 1j*convolve1d(mvis_.imag, SRF_kernel, axis=0, mode='nearest')
 
         # remove pads
-        mvis = mvis[chpad:-chpad,:]
-        noisy_mvis = noisy_mvis[chpad:-chpad,:]
+        p_mvis = p_mvis[chpad:-chpad,:]
+        n_mvis = n_mvis[chpad:-chpad,:]
       
         # populate both polarizations
-        mvis = np.tile(mvis, (2, 1, 1))
-        noisy_mvis = np.tile(noisy_mvis, (2, 1, 1))
+        p_mvis = np.tile(p_mvis, (2, 1, 1))
+        n_mvis = np.tile(n_mvis, (2, 1, 1))
 
-        return mvis, noisy_mvis
+        return p_mvis, n_mvis
         
     else:
         # remove pads
-        mvis = mvis[chpad:-chpad,:]
+        p_mvis = p_mvis[chpad:-chpad,:]
         
         # populate both polarizations
-        mvis = np.tile(mvis, (2, 1, 1))
+        p_mvis = np.tile(p_mvis, (2, 1, 1))
 
-        return mvis
+        return p_mvis
 
 
 def vismodel_iter(pars, fixed, dataset, gcf, corr, imethod='cubic', chpad=3):
@@ -404,3 +403,133 @@ def vismodel_iter(pars, fixed, dataset, gcf, corr, imethod='cubic', chpad=3):
 
     # return the model visibilities
     return mvis
+
+
+
+def vismodel_FITS(pars, fixed, dataset,
+                  imethod='cubic', return_holders=False, chpad=3,
+                  noise_inject=None):
+
+    ### - Prepare inputs
+    # Parse fixed parameters
+    restfreq, FOV, Npix, dist, cfg_dict = fixed
+    npars = len(pars)
+
+    # Ingest the model cube 
+    mcube = parametric_disk([0], pars, fixed)
+
+    # Calculate the model cube velocities
+    v_model = sc.c * (1 - mcube.freqs / restfreq)
+
+
+    ### "Reduce" the input dataset to overlapping spectral coverage
+    # Find the frequency axis indices nearest the min/max of the input cube
+    chslo = np.argmin(np.abs(dataset.nu_LSRK - mcube.freqs.min()), axis=1)
+    chshi = np.argmin(np.abs(dataset.nu_LSRK - mcube.freqs.max()), axis=1)
+
+    # Determine the directionality of the frequency axis
+    dir_spec = np.sign(np.diff(dataset.nu_TOPO)[0])
+
+    # Select the channel index boundaries in the dataset, interior to the 
+    # specified cube boundaries (to minimize passing problematic results due to
+    # SRF convolution near the boundaries)
+    ncut = 1
+    if dir_spec > 0:
+        chlo, chhi = np.max(chslo) + ncut, np.min(chshi) - ncut
+    else:
+        chhi, chlo = np.min(chslo) - ncut, np.max(chshi) + ncut
+
+    # Extract only the spectral region of interest from the dataset
+    dataset.nu_TOPO = dataset.nu_TOPO[chlo:chhi+1]
+    dataset.nu_LSRK = dataset.nu_LSRK[:,chlo:chhi+1]
+    dataset.vis = dataset.vis[:,chlo:chhi+1,:]
+    dataset.nchan = len(dataset.nu_TOPO)
+    
+
+    # Spatial frequencies to lambda units
+    uu = dataset.um * np.mean(dataset.nu_TOPO) / sc.c
+    vv = dataset.vm * np.mean(dataset.nu_TOPO) / sc.c
+
+    # Pad the frequency arrays
+    dnu_TOPO = np.diff(dataset.nu_TOPO)[0]
+    nu_TOPO_s = dataset.nu_TOPO[0] + dnu_TOPO * np.arange(-chpad, 0, 1)
+    nu_TOPO_f = dataset.nu_TOPO[-1] + dnu_TOPO * np.arange(1, chpad+1, 1)
+    nu_TOPO = np.concatenate((nu_TOPO_s, dataset.nu_TOPO, nu_TOPO_f))
+
+    dnu_LSRK = np.diff(dataset.nu_LSRK, axis=1)[:,0]
+    nu_LSRK_s = (dataset.nu_LSRK[:,0])[:,None] + \
+                dnu_LSRK[:,None] * np.arange(-chpad, 0, 1)[None,:]
+    nu_LSRK_f = (dataset.nu_LSRK[:,-1])[:,None] + \
+                dnu_LSRK[:,None] * np.arange(1, chpad+1, 1)[None,:]
+    nu_LSRK = np.concatenate((nu_LSRK_s, dataset.nu_LSRK, nu_LSRK_f), axis=1)
+
+    # LSRK velocities 
+    v_grid = sc.c * (1 - nu_LSRK / restfreq)
+
+    # sample the FT of the cube onto the observed spatial frequencies
+    mvis, gcf, corr = vis_sample(imagefile=mcube, uu=uu, vv=vv,
+                                 return_gcf=True, return_corr_cache=True,
+                                 mod_interp=False)
+    mvis = mvis.T
+
+    # distribute interpolates to different timestamps
+    mvis_ = np.zeros((nu_LSRK.shape[1], mvis.shape[1]), dtype=complex)
+    for itime in range(dataset.nstamps):
+        ixl = np.min(np.where(dataset.tstamp == itime))
+        ixh = np.max(np.where(dataset.tstamp == itime)) + 1
+        fint = interp1d(v_model, mvis[:,ixl:ixh], axis=0, kind=imethod,
+                        bounds_error=False, fill_value=0.0)
+        mvis_[:,ixl:ixh] = fint(v_grid[itime,:])
+
+
+    ### - Configure noise (if necessary)
+    if noise_inject is not None:
+        # Scale input RMS for desired (naturally-weighted) noise per vis-chan
+        sigma_out = 1e-3 * noise_inject * np.sqrt(dataset.npol * dataset.nvis)
+        sigma_noise = 1.15 * sigma_out * np.sqrt(8./3.)
+
+        # Random Gaussian noise draws
+        noise = np.random.normal(0, sigma_noise,
+                                 (mvis_.shape[0], dataset.nvis, 2))
+        noise = np.squeeze(noise)
+        noise = noise[:,:,0] + 1j * noise[:,:,1]
+
+    # convolve with the SRF
+    SRF_kernel = np.array([0, 0.25, 0.5, 0.25, 0])
+    p_mvis = convolve1d(mvis_.real, SRF_kernel, axis=0, mode='nearest') + \
+             1j*convolve1d(mvis_.imag, SRF_kernel, axis=0, mode='nearest')
+
+    # return the dataset after replacing the visibilities with the model
+    if return_holders:
+        # remove pads
+        p_mvis = p_mvis[chpad:-chpad,:]
+
+        # populate both polarizations
+        p_mvis = np.tile(p_mvis, (2, 1, 1))
+
+        return p_mvis, gcf, corr, dataset
+
+    elif noise_inject is not None:
+        # inject noise before SRF convolution 
+        mvis_ += noise
+        n_mvis = convolve1d(mvis_.real, SRF_kernel, axis=0, mode='nearest') + \
+                 1j*convolve1d(mvis_.imag, SRF_kernel, axis=0, mode='nearest')
+
+        # remove pads
+        p_mvis = p_mvis[chpad:-chpad,:]
+        n_mvis = n_mvis[chpad:-chpad,:]
+
+        # populate both polarizations
+        p_mvis = np.tile(p_mvis, (2, 1, 1))
+        n_mvis = np.tile(n_mvis, (2, 1, 1))
+
+        return p_mvis, n_mvis, dataset
+
+    else:
+        # remove pads
+        p_mvis = p_mvis[chpad:-chpad,:]
+
+        # populate both polarizations
+        p_mvis = np.tile(p_mvis, (2, 1, 1))
+
+        return p_mvis, dataset

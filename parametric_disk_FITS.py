@@ -45,6 +45,6 @@ def parametric_disk(velax, pars, pars_fixed, quiet=True):
               hd['CDELT3'] * (np.arange(hd['NAXIS3']) - (hd['CRPIX3'] - 1))
 
     # Re-orient cube array
-    cube = (np.rollaxis(im_cube, 0, 3))
+    cube = np.rollaxis(im_cube, 0, 3)
 
     return SkyImage(cube, dx, dy, nu_cube, None)

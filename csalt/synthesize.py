@@ -7,7 +7,7 @@ import os, sys, importlib
 import numpy as np
 import h5py
 from csalt.data import dataset, HDF_to_dataset, dataset_to_HDF
-from csalt.models import vismodel_full, vismodel_def
+from csalt.models import vismodel_full, vismodel_def, vismodel_FITS
 sys.path.append('configs/')
 
 
@@ -106,6 +106,13 @@ def make_data(cfg_file, mtype='csalt', new_template=True):
     # Run checks on the setups and load the configuration file inputs
     inp = check_setups(cfg_file)
 
+    # Copy as appropriate the corresponding parametric_disk script
+    if not os.path.exists('parametric_disk_'+mtype+'.py'):
+        print('There is no such file "parametric_disk_"+mtype+".py".\n')
+        return
+    else:
+        os.system('cp parametric_disk_'+mtype+'.py parametric_disk.py')
+
     # Make the (blank) template observations (if requested or necessary)
     tfiles = [inp.template_dir+i+'.h5' for i in inp.template]
     if np.logical_or(new_template,
@@ -120,10 +127,16 @@ def make_data(cfg_file, mtype='csalt', new_template=True):
 
         # Calculate the model visibilities in pure (p) and noisy (n) cases
         fixed = inp.nu_rest, inp.FOV[EB], inp.Npix[EB], inp.dist, inp.cfg_dict
+        print('\n...Computing model visibilities for EB '+\
+              str(EB+1)+'/'+str(len(inp.template))+'...')
         if mtype == 'csalt':
             mvis_p, mvis_n = vismodel_full(inp.pars, fixed, tmp_dataset, 
                                            oversample=inp.nover, 
                                            noise_inject=inp.RMS[EB])
+        elif mtype == 'FITS':
+            mvis_p, mvis_n, dset_ = vismodel_FITS(inp.pars, fixed, tmp_dataset,
+                                                  noise_inject=inp.RMS[EB])
+            tmp_dataset = dset_
         else:
             mvis_p, mvis_n = vismodel_def(inp.pars, fixed, tmp_dataset,
                                           noise_inject=inp.RMS[EB])
@@ -145,21 +158,30 @@ def make_data(cfg_file, mtype='csalt', new_template=True):
         dataset_to_HDF(noisy_dataset, hdf_out+'.noisy')
 
 
+
     # Pack these outputs into "raw", concatenated MS files (like real data)
+    print('\n\n...Packing model visibilities into MS files...\n\n')
     os.system('rm -rf '+inp.casalogs_dir+'pack_synth_data.'+cfg_file+'.log')
-    os.system('casa --nologger --logfile '+inp.casalogs_dir+ \
-              'pack_synth_data.'+cfg_file+'.log '+ \
-              '-c csalt/CASA_scripts/pack_synth_data.py '+cfg_file)
+    if mtype == 'FITS':
+        os.system('casa --nologger --logfile '+inp.casalogs_dir+ \
+                  'pack_synth_data.'+cfg_file+'.log '+ \
+                  '-c csalt/CASA_scripts/pack_synth_data_FITS.py '+cfg_file)
+    else:
+        os.system('casa --nologger --logfile '+inp.casalogs_dir+ \
+                  'pack_synth_data.'+cfg_file+'.log '+ \
+                  '-c csalt/CASA_scripts/pack_synth_data.py '+cfg_file)
 
     # Format the data into "reduced" form (+ time-average if desired) 
-    os.system('rm -rf '+inp.casalogs_dir+'format_data.'+cfg_file+'.log')
-    os.system('casa --nologger --logfile '+inp.casalogs_dir+ \
-              'format_data.'+cfg_file+'.log '+ \
-              '-c csalt/CASA_scripts/format_data.py configs/gen_'+ \
-              cfg_file+' pure')
-    os.system('casa --nologger --logfile '+inp.casalogs_dir+ \
-              'format_data.'+cfg_file+'.log '+ \
-              '-c csalt/CASA_scripts/format_data.py configs/gen_'+ \
-              cfg_file+' noisy')
+    if mtype != 'FITS':
+        print('...Formatting MS data into reduced form...')
+        os.system('rm -rf '+inp.casalogs_dir+'format_data.'+cfg_file+'.log')
+        os.system('casa --nologger --logfile '+inp.casalogs_dir+ \
+                  'format_data.'+cfg_file+'.log '+ \
+                  '-c csalt/CASA_scripts/format_data.py configs/gen_'+ \
+                  cfg_file+' pure')
+        os.system('casa --nologger --logfile '+inp.casalogs_dir+ \
+                  'format_data.'+cfg_file+'.log '+ \
+                  '-c csalt/CASA_scripts/format_data.py configs/gen_'+ \
+                  cfg_file+' noisy')
 
     return 

@@ -1,55 +1,23 @@
 import os, sys, time, importlib
 import numpy as np
-from csalt.data import *
-from csalt.models import *
-import emcee
-import corner
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+from csalt.data import *
+from csalt.models import *
+from priors import *
+import emcee
+import corner
 from scipy import stats
 from multiprocessing import Pool
 os.environ["OMP_NUM_THREADS"] = "1"
 sys.path.append('configs/')
 
 
-# prior functions
-def lnp_uniform(theta, ppars):
-    if ((theta >= ppars[0]) and (theta <= ppars[1])):
-        return 0
-    else:
-        return -np.inf
-
-def lnp_normal(theta, ppars):
-    return -0.5 * (theta - ppars[0])**2 / ppars[1]**2
-
-
-
-# log-prior calculator
-def lnprior(theta):
-
-    # initialize
-    ptheta = np.empty_like(theta)
-
-    # loop through parameters
-    for ip in range(len(theta)):
-        pri_type = inp.priors_['types'][ip]
-        pri_pars = inp.priors_['pars'][ip]
-        if pri_type == 'uniform':
-            ptheta[ip] = lnp_uniform(theta[ip], pri_pars)
-        elif pri_type == 'normal':
-            ptheta[ip] = lnp_normal(theta[ip], pri_pars)
-        else:
-            ptheta[ip] = -np.inf
-
-    return ptheta
-
-
-
 # log-posterior calculator
 def lnprob(theta):	
 
     # compute the log-prior and return if problematic
-    lnT = np.sum(lnprior(theta)) * data_['nobs']
+    lnT = np.sum(logprior(theta)) * data_['nobs']
     if lnT == -np.inf:
         return -np.inf, -np.inf
 
@@ -61,9 +29,7 @@ def lnprob(theta):
         dat = data_[str(EB)]
 
         # calculate model visibilities
-        fixed = inp.nu_rest, inp.FOV[EB], inp.Npix[EB], inp.dist, \
-                inp.cfg_dict
-        mvis = vismodel_iter(theta, fixed, dat,
+        mvis = vismodel_iter(theta, fixed_, dat,
                              data_['gcf'+str(EB)], data_['corr'+str(EB)])
 
         # spectrally bin the model
@@ -83,75 +49,142 @@ def lnprob(theta):
 
 
 
+# log-posterior calculator
+def lnprob_naif(theta):
 
-def run_emcee(cfg_file, nsteps=1000, append=False):
+    # compute the log-prior and return if problematic
+    lnT = np.sum(logprior(theta)) * data_['nobs']
+    if lnT == -np.inf:
+        return -np.inf, -np.inf
 
-    # Load the configuration file contents
-    try:
-        global inp
-        inp = importlib.import_module('mconfig_'+cfg_file)
-    except:
-        print('\nThere is a problem with the configuration file:')
-        print('trying to use configs/mconfig_'+cfg_file+'.py\n')
-        sys.exit()
+    # loop through observations to compute the log-likelihood
+    lnL = 0
+    for EB in range(data_['nobs']):
+
+        # get the inference dataset
+        dat = data_[str(EB)]
+
+        # calculate model visibilities
+        mvis = vismodel_naif(theta, fixed_, dat,
+                             data_['gcf'+str(EB)], data_['corr'+str(EB)])
+
+        # compute the residuals (stack both pols)
+        resid = np.hstack(np.absolute(dat.vis - mvis))
+        var = np.hstack(dat.wgt)
+
+        # compute the log-likelihood
+        lnL += -0.5 * np.tensordot(resid, np.dot(dat.inv_cov, var * resid))
+
+    # return the log-posterior and log-prior
+    return lnL + dat.lnL0 + lnT, lnT
 
 
-    # package data for inference purposes
+
+
+
+def run_emcee(datafile, fixed, vra=None, vcensor=None, 
+              nwalk=75, ninits=200, nsteps=1000, chbin=2, 
+              outfile='stdout.h5', append=False, mode='iter'):
+
+    # load the data
     global data_
-    data_ = fitdata(inp, vra=inp.vra_fit, vcensor=inp.vra_cens)
+    data_ = fitdata(datafile, vra=vra, vcensor=vcensor, 
+                    nu_rest=fixed[0], chbin=chbin)
 
+    # assign fixed
+    global fixed_
+    fixed_ = fixed
 
-    # initialize parameters
-    p_lo, p_hi = inp.init_[:,0], inp.init_[:,1]
-    ndim, nwalk = len(p_lo), inp.nwalkers
-    p0 = [np.random.uniform(p_lo, p_hi, ndim) for iw in range(nwalk)]
+    # initialize parameters using random draws from the priors
+    ndim = len(pri_pars)
+    p0 = np.empty((nwalk, ndim))
+    for ix in range(ndim):
+        _ = [str(pri_pars[ix][ip])+', ' for ip in range(len(pri_pars[ix]))]
+        cmd = 'np.random.'+pri_types[ix]+'('+"".join(_)+str(nwalk)+')'
+        p0[:,ix] = eval(cmd)
 
 
     # acquire gcfs and corr caches from preliminary model calculations
     for EB in range(data_['nobs']):
 
-        # set fixed parameters
-        fixed = inp.nu_rest, inp.FOV[EB], inp.Npix[EB], inp.dist, inp.cfg_dict
-
         # initial model calculations
-        _mvis, gcf, corr = vismodel_def(p0[0], fixed, data_[str(EB)],
-                                        return_holders=True)
+        if mode == 'naif':
+            _mvis, gcf, corr = vismodel_naif(p0[0], fixed_, data_[str(EB)],
+                                             return_holders=True)
+        else:
+            _mvis, gcf, corr = vismodel_def(p0[0], fixed_, data_[str(EB)],
+                                            return_holders=True)
 
         # add gcf, corr caches into data dictionary, indexed by EB
         data_['gcf'+str(EB)] = gcf
         data_['corr'+str(EB)] = corr
 
 
-
     # Configure backend for recording posterior samples
-    fitout = inp.fitname+inp.basename+inp._ext+inp._fitnote+'/'
-    if not os.path.exists(fitout):
-        if not os.path.exists(inp.fitname):
-            os.mkdir(inp.fitname)
-        os.mkdir(fitout)
-        os.mkdir(fitout+'posteriors/')
-    post_file = fitout+'posteriors/emcee_samples.h5'
+    post_file = outfile
     if not append:
+        # run to initialize
+        if mode == 'naif':
+            print('\n Note: running in naif mode... \n')
+            with Pool() as pool:
+                isampler = emcee.EnsembleSampler(nwalk, ndim, lnprob_naif, 
+                                                 pool=pool)
+                isampler.run_mcmc(p0, ninits, progress=True)
+        else:
+            with Pool() as pool:
+                isampler = emcee.EnsembleSampler(nwalk, ndim, lnprob, pool=pool)
+                isampler.run_mcmc(p0, ninits, progress=True)
+        
+        # reset initialization to more compact distributions
+        # this does random, uniform draws from the inner quartiles of the 
+        # walker distributions at the end initialization step (effectively 
+	# pruning outlier walkers stuck far from the mode)
+        isamples = isampler.get_chain()	  # [ninits, nwalk, ndim]-shaped
+        lop0 = np.quantile(isamples[-1, :, :], 0.25, axis=0)
+        hip0 = np.quantile(isamples[-1, :, :], 0.75, axis=0)
+        p00 = [np.random.uniform(lop0, hip0, ndim) for iw in range(nwalk)]
+        print('\nChains now properly initialized...\n')
+
+        # prepare the backend file for the full run
         os.system('rm -rf '+post_file)
         backend = emcee.backends.HDFBackend(post_file)
         backend.reset(nwalk, ndim)
         
-        with Pool() as pool:
-            sampler = emcee.EnsembleSampler(nwalk, ndim, lnprob, pool=pool,
-                                            backend=backend)
-            t0 = time.time()
-            sampler.run_mcmc(p0, nsteps, progress=True)
-        t1 = time.time()
+        # run the MCMC
+        if mode == 'naif':
+            with Pool() as pool:
+                sampler = emcee.EnsembleSampler(nwalk, ndim, lnprob_naif,
+                                                pool=pool, backend=backend)
+                t0 = time.time()
+                sampler.run_mcmc(p00, nsteps, progress=True)
+            t1 = time.time()
+        else:
+            with Pool() as pool:
+                sampler = emcee.EnsembleSampler(nwalk, ndim, lnprob, pool=pool,
+                                                backend=backend)
+                t0 = time.time()
+                sampler.run_mcmc(p00, nsteps, progress=True)
+            t1 = time.time()
     else:
         new_backend = emcee.backends.HDFBackend(post_file)
         print("Initial size: {0}".format(new_backend.iteration))
 
-        with Pool() as pool:
-            new_sampler = emcee.EnsembleSampler(nwalk, ndim, lnprob, pool=pool,
-                                                backend=new_backend)
-            t0 = time.time()
-            new_sampler.run_mcmc(None, nsteps, progress=True)
-        t1 = time.time()
+        if mode == 'naif':
+            with Pool() as pool:
+                new_sampler = emcee.EnsembleSampler(nwalk, ndim, lnprob_naif, 
+                                                    pool=pool, 
+                                                    backend=new_backend)
+                t0 = time.time()
+                new_sampler.run_mcmc(None, nsteps, progress=True)
+            t1 = time.time()
+        else:
+            with Pool() as pool:
+                new_sampler = emcee.EnsembleSampler(nwalk, ndim, lnprob, 
+                                                    pool=pool,
+                                                    backend=new_backend)
+                t0 = time.time()
+                new_sampler.run_mcmc(None, nsteps, progress=True)
+            t1 = time.time()
         print("Final size: {0}".format(new_backend.iteration))
 
     print(' ')
@@ -181,20 +214,11 @@ def post_summary(p, prec=0.1, mu='peak', CIlevs=[84.135, 15.865, 50.]):
 
 
 
-def post_analysis(cfg_file, burnin=0, autocorr=False, Ntau=200, 
-                  corner_plot=True):
-
-    # Load the configuration file contents
-    try:
-        inp = importlib.import_module('mconfig_'+cfg_file)
-    except:
-        print('\nThere is a problem with the configuration file:')
-        print('trying to use configs/mconfig_'+cfg_file+'.py\n')
-        sys.exit()
+def post_analysis(outfile, burnin=0, autocorr=False, Ntau=200, 
+                  corner_plot=True, truths=None):
 
     # load the emcee backend file
-    fitout = inp.fitname+inp.basename+inp._ext+inp._fitnote+'/'
-    reader = emcee.backends.HDFBackend(fitout+'posteriors/emcee_samples.h5')
+    reader = emcee.backends.HDFBackend(outfile)
 
     # parse the samples
     all_samples = reader.get_chain(discard=0, flat=False)
@@ -207,7 +231,6 @@ def post_analysis(cfg_file, burnin=0, autocorr=False, Ntau=200,
     # set parameter labels, truths (NOT HARDCODE!)
     lbls = ['incl', 'PA', 'M', 'r_l', 'z0', 'psi', 'Tb0', 'q', 'Tback', 'dV0',
             'tau0', 'p', 'vsys', 'dx', 'dy']
-    theta = inp.pars
 
 
     # Plot the integrated autocorrelation time every Ntau steps
@@ -229,7 +252,7 @@ def post_analysis(cfg_file, burnin=0, autocorr=False, Ntau=200,
         plt.ylabel('autocorr time (steps)')
         plt.xlim([0, Nmax])
         plt.ylim([0, tau_ix.max() + 0.1 * (tau_ix.max() - tau_ix.min())])
-        fig.savefig(fitout+'autocorr.png')
+        fig.savefig('autocorr.png')
         fig.clf()
 
 
@@ -272,7 +295,8 @@ def post_analysis(cfg_file, burnin=0, autocorr=False, Ntau=200,
         for iw in range(nwalk):
             ax.plot(np.arange(nsteps), samples[:, iw, idim], 
                     color='k', alpha=0.03)
-        ax.plot([0, nsteps], [theta[idim], theta[idim]], '--C1', lw=1.5)
+        if truths is not None:
+            ax.plot([0, nsteps], [truths[idim], truths[idim]], '--C1', lw=1.5)
         ax.set_xlim([0, nsteps])
         ax.tick_params(which='both', labelsize=6)
         ax.set_ylabel(lbls[idim], fontsize=6)
@@ -285,7 +309,7 @@ def post_analysis(cfg_file, burnin=0, autocorr=False, Ntau=200,
 
     fig.subplots_adjust(wspace=0.20, hspace=0.05)
     fig.subplots_adjust(left=0.03, right=0.97, bottom=0.05, top=0.99)
-    fig.savefig(fitout+'traces.png')
+    fig.savefig('traces.png')
     fig.clf()
 
 
@@ -294,8 +318,8 @@ def post_analysis(cfg_file, burnin=0, autocorr=False, Ntau=200,
         levs = 1. - np.exp(-0.5 * (np.arange(3) + 1)**2)
         flat_chain = samples.reshape(-1, ndim)
         fig = corner.corner(flat_chain, plot_datapoints=False, levels=levs,
-                            labels=lbls, truths=theta)
-        fig.savefig(fitout+'corner.png')
+                            labels=lbls, truths=truths)
+        fig.savefig('corner.png')
         fig.clf()
 
 
@@ -308,7 +332,3 @@ def post_analysis(cfg_file, burnin=0, autocorr=False, Ntau=200,
         pk, hi, lo, med = post_summary(samples_[:,idim], prec=prec[idim])
         print((lbls[idim] + ' = '+fmt+' +'+fmt+' / -'+fmt).format(pk, hi, lo))
     print(' ')
-
-
-
-

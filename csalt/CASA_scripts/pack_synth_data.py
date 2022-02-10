@@ -75,16 +75,16 @@ os.system('rm -rf '+synthraw_dir+basename+'/'+basename+'_pure.ms*')
 os.system('rm -rf '+synthraw_dir+basename+'/'+basename+'_noisy.ms*')
 if len(template) > 1:
     concat(vis=pure_files, 
-           concatvis=synthraw_dir+basename+'/'+cfg_file+'_pure.ms',
+           concatvis=synthraw_dir+basename+'/'+basename+'_pure.ms',
            dirtol='0.1arcsec', copypointing=False)
     concat(vis=noisy_files,
-           concatvis=synthraw_dir+basename+'/'+cfg_file+'_noisy.ms',
+           concatvis=synthraw_dir+basename+'/'+basename+'_noisy.ms',
            dirtol='0.1arcsec', copypointing=False)
 else:
     os.system('cp -r '+pure_files[0]+' '+synthraw_dir+basename+'/'+ \
-              cfg_file+'_pure.ms')
+              basename+'_pure.ms')
     os.system('cp -r '+noisy_files[0]+' '+synthraw_dir+basename+'/'+ \
-              cfg_file+'_noisy.ms')
+              basename+'_noisy.ms')
 
 # Cleanup 
 for EB in range(len(pure_files)):

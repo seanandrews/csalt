@@ -6,6 +6,8 @@
 import os, sys, importlib
 import numpy as np
 import h5py
+import copy
+import matplotlib.pyplot as plt
 from csalt.data import dataset, HDF_to_dataset, dataset_to_HDF
 from csalt.models import vismodel_full, vismodel_def, vismodel_FITS
 sys.path.append('configs/')
@@ -101,7 +103,7 @@ def make_template(cfg_file):
 
 
 
-def make_data(cfg_file, mtype='csalt', new_template=True):
+def make_data(cfg_file, mtype='CSALT', calctype='full', new_template=True):
 
     # Run checks on the setups and load the configuration file inputs
     inp = check_setups(cfg_file)
@@ -110,8 +112,6 @@ def make_data(cfg_file, mtype='csalt', new_template=True):
     if not os.path.exists('parametric_disk_'+mtype+'.py'):
         print('There is no such file "parametric_disk_"+mtype+".py".\n')
         return
-    else:
-        os.system('cp parametric_disk_'+mtype+'.py parametric_disk.py')
 
     # Make the (blank) template observations (if requested or necessary)
     tfiles = [inp.template_dir+i+'.h5' for i in inp.template]
@@ -129,17 +129,20 @@ def make_data(cfg_file, mtype='csalt', new_template=True):
         fixed = inp.nu_rest, inp.FOV[EB], inp.Npix[EB], inp.dist, inp.cfg_dict
         print('\n...Computing model visibilities for EB '+\
               str(EB+1)+'/'+str(len(inp.template))+'...')
-        if mtype == 'csalt':
-            mvis_p, mvis_n = vismodel_full(inp.pars, fixed, tmp_dataset, 
-                                           oversample=inp.nover, 
-                                           noise_inject=inp.RMS[EB])
-        elif mtype == 'FITS':
+        if mtype == 'FITS':
             mvis_p, mvis_n, dset_ = vismodel_FITS(inp.pars, fixed, tmp_dataset,
                                                   noise_inject=inp.RMS[EB])
             tmp_dataset = dset_
         else:
-            mvis_p, mvis_n = vismodel_def(inp.pars, fixed, tmp_dataset,
-                                          noise_inject=inp.RMS[EB])
+            if calctype == 'full':
+                mvis_p, mvis_n = vismodel_full(inp.pars, fixed, tmp_dataset, 
+                                               oversample=inp.nover, 
+                                               mtype=mtype,
+                                               noise_inject=inp.RMS[EB])
+            else: 
+                mvis_p, mvis_n = vismodel_def(inp.pars, fixed, tmp_dataset,
+                                              mtype=mtype,
+                                              noise_inject=inp.RMS[EB])
 
         # Calculate model weights
         sigma_out = 1e-3 * inp.RMS[EB] * \
@@ -147,11 +150,13 @@ def make_data(cfg_file, mtype='csalt', new_template=True):
         mwgt = np.sqrt(1 / sigma_out) * np.ones_like(tmp_dataset.wgt)
 
         # Populate "pure" and "noisy" datasets
-        pure_dataset, noisy_dataset = tmp_dataset, tmp_dataset
+        pure_dataset = copy.deepcopy(tmp_dataset)
+        noisy_dataset = copy.deepcopy(tmp_dataset)
         pure_dataset.vis, noisy_dataset.vis = mvis_p, mvis_n
         pure_dataset.wgt, noisy_dataset.wgt = mwgt, mwgt
 
         # Store "raw" synthetic data ("pure" and "noisy") in HDF5 
+        print('Writing out pure and noisy data')
         hdf_out = inp.synthraw_dir+inp.basename+'/'+inp.basename+'_EB'+str(EB)
         os.system('rm -rf '+hdf_out+'.*.h5')
         dataset_to_HDF(pure_dataset, hdf_out+'.pure')

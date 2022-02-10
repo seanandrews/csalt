@@ -15,7 +15,7 @@ _mu = 2.37
 _mH = (sc.m_e + sc.m_p) * 1e3
 _k  = sc.k * 1e7
 _G  = sc.G * 1e3
-_pc = 3.09e18
+_pc = 3.0857e18
 
 
 class radmc_setup:
@@ -67,8 +67,17 @@ class radmc_setup:
         # radial grid in [cm]
         self.r_in  = args["r_min"] * _AU
         self.r_out = args["r_max"] * _AU
-        self.r_walls = np.logspace(np.log10(self.r_in), np.log10(self.r_out),
-                                   self.nr+1)
+        #self.r_walls = np.logspace(np.log10(self.r_in), np.log10(self.r_out),
+        #                           self.nr+1)
+
+        ### temporarily add cells around "edge"
+        rlog = np.logspace(np.log10(self.r_in), np.log10(self.r_out), self.nr+1)
+        r_l = 225 * _AU
+        ixl, ixh = np.abs(rlog - r_l).argmin() - 1, np.abs(rlog - r_l).argmin()
+        rint = np.linspace(rlog[ixl], rlog[ixh], 20)
+        self.r_walls = np.concatenate((rlog[:ixl], rint, rlog[ixh+1:]))
+        self.nr = self.r_walls.size - 1
+
         self.r_centers = np.average([self.r_walls[:-1], self.r_walls[1:]],
                                     axis=0)
         assert self.r_centers.size == self.nr
@@ -244,7 +253,8 @@ class radmc_setup:
             f.close()
 
             # copy appropriate molecular data file
-            os.system('cp moldata/' + self.setup["molecule"]+'.dat ' + \
+            moldir = '/pool/asha0/SCIENCE/csalt/moldata/'
+            os.system('cp '+moldir+self.setup["molecule"]+'.dat ' + \
                       self.modelname + \
                       '/molecule_' + self.setup["molecule"]+'.inp')
 
@@ -300,14 +310,14 @@ class radmc_structure:
         # calculate the gas density structure
         self.set_density()
 
-        # set molecular number density structure
-        self.set_nmol()
-
         # set line-width structure
         self.set_turbulence()
 
         # set gas velocity structure
         self.set_vgas()
+
+        # set molecular number density structure
+        self.set_nmol()
 
 
 
@@ -353,9 +363,22 @@ class radmc_structure:
                     dT, dz = np.diff(np.log(Tz)), np.diff(zg)
                     dlnTdz = np.append(dT, dT[-1]) / np.append(dz, dz[-1])
 
+                    # scale height
+                    Hp = np.sqrt(_k * Tz / (_mu * _mH)) / \
+                         self.func_omega(r, zg)
+                    if self.do_vsg:
+                        Q = np.sqrt(_k * Tz / (_mu * _mH)) * \
+                            self.func_omega(r, zg) / \
+                            (np.pi * _G * self.func_sigma(r))
+                        H = np.sqrt(np.pi / 2) * (np.pi / (4 * Q)) * \
+                            (np.sqrt(1 + 8 * Q**2 / np.pi) - 1) * Hp
+                    else:
+                        H = Hp
+
                     # vertical gravity
-                    gz = self.func_omega(r, zg)**2 * zg
-                    gz /= (_k * Tz / (_mu * _mH))
+                    gz = zg / H**2
+#                    gz = self.func_omega(r, zg)**2 * zg
+#                    gz /= (_k * Tz / (_mu * _mH))
 
                     # vertical density gradient
                     dlnpdz = -dlnTdz - gz
@@ -381,17 +404,6 @@ class radmc_structure:
                        comments='')
 
 
-    def set_nmol(self, write=True):
-
-        abund_ = self.func_abund(self.rcyl, self.zcyl) 
-        self.nmol = abund_ * self.rho_gas / (_mu * _mH)
-
-        if write:
-            np.savetxt(self.modelname+'/numberdens_'+self.smol+'.inp',
-                       np.ravel(self.nmol), fmt='%.6e', header=self.hdr, 
-                       comments='')
-
-
     def set_turbulence(self, write=True):
 
         self.dVturb = self.func_nonthermal_linewidth(self.rcyl, self.zcyl)
@@ -413,7 +425,7 @@ class radmc_structure:
             dP = np.gradient(P, self.rvals, axis=1) * np.sin(self.tt) + \
                  np.gradient(P, self.tvals, axis=0) * np.cos(self.tt) / self.rr
             vprs2 = self.rr * np.sin(self.tt) * dP / self.rho_gas
-            vprs2 = np.where(np.isfinite(vprs2), vprs2, 0.0)
+            #vprs2 = np.where(np.isfinite(vprs2), vprs2, 0.0)
         else:
             vprs2 = 0.
 
@@ -437,7 +449,10 @@ class radmc_structure:
 
         # combined azimuthal velocity profile
         vtot2 = vkep2 + vprs2 + vsg2
-        vtot2[vtot2 < 0] = 0.
+        self.vmask = np.logical_or((vtot2 < 0), 
+                                   np.logical_or(np.isnan(vtot2), 
+                                                 np.isneginf(vtot2)))
+        vtot2[self.vmask] = 0.
         self.vphi = np.sqrt(vtot2)
 
         if write:
@@ -448,16 +463,43 @@ class radmc_structure:
                        fmt='%.6e', header=self.hdr, comments='')
 
 
+    """
+    Note: I've set nmol = 0 in regions where dP/dr tries to dominate the
+          velocity field.  This is to avoid numerical artifacts near very steep
+	  gradients, though it's not super elegant and I haven't perhaps
+	  imagined pathological scenarios where this is bad.
+    """
+    def set_nmol(self, write=True):
+
+        abund_ = self.func_abund(self.rcyl, self.zcyl)
+        self.nmol = abund_ * self.rho_gas / (_mu * _mH)
+        print(self.nmol.min())
+
+        # kinematics mask
+        self.nmol[self.vmask] = 0.
+        print(self.nmol.min())
+
+        if write:
+            np.savetxt(self.modelname+'/numberdens_'+self.smol+'.inp',
+                       np.ravel(self.nmol), fmt='%.6e', header=self.hdr,
+                       comments='')
+
+
     def get_cube(self, inc, PA, dist, nu_rest, FOV, Npix, velax=[0], vlsr=0):
 
+        # deal with geometry
+        if inc < 0:
+            inc = np.abs(inc) + 180
+            PA -= 180
+
         # position angle convention
-        posang = PA - 90.
+        posang = 90 - PA 
 
         # spatial settings
         sizeau = FOV * dist
 
         # frequency settings
-        wlax = 1e6 * sc.c / (nu_rest * (1. - velax / sc.c))
+        wlax = 1e6 * sc.c / (nu_rest * (1. - (velax - vlsr) / sc.c))
         os.system('rm -rf '+self.modelname+'/camera_wavelength_micron.inp')
         np.savetxt(self.modelname+'/camera_wavelength_micron.inp', wlax,
                    header=str(len(wlax))+'\n', comments='')

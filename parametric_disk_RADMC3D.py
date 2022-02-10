@@ -5,7 +5,7 @@ An example of how to use simple_disk to make a parametric disk model.
 import os, sys
 import numpy as np
 import scipy.constants as sc
-from radmc_disk import radmc_structure
+from csalt.radmc_disk import radmc_structure
 from vis_sample.classes import SkyImage
 
 
@@ -18,7 +18,7 @@ _k  = sc.k * 1e7
 _G  = sc.G * 1e3
 
 
-def parametric_disk(velax, pars, pars_fixed, quiet=True):
+def parametric_disk(velax, pars, pars_fixed, struct_only=False, quiet=True):
     """
     Build a parametric disk.
 
@@ -31,21 +31,28 @@ def parametric_disk(velax, pars, pars_fixed, quiet=True):
     # Parse the inputs
     restfreq, FOV, npix, dist, cfg_dict = pars_fixed
 
-    inc, PA, mstar, r_l, Tmid0, Tatm0, qmid, qatm, hs_p, ws_p, Sigma0_gas, \
-        p1, p2, xmol, depl, ab_zrmin, ab_zrmax, ab_rmin, ab_rmax, xi, \
+    inc, PA, mstar, r_l, Tmid0, Tatm0, qmid, qatm, a_z, w_z, Sigma0_gas, \
+        p1, p2, xmol, depl, Tfrz, ab_zrmax, ab_rmin, ab_rmax, xi, \
         vlsr, dx, dy = pars
 
     # Fixed and adjusted parameters
     r0 = 10 * _AU
-    Tmin, Tmax = 5., 1500.
+    Tmin, Tmax = 0., 1000.
 
 
     # Set up the temperature structure function
     def T_gas(r, z):
         Tmid, Tatm = Tmid0 * (r / r0)**qmid, Tatm0 * (r / r0)**qatm	
-        #H_mid = np.sqrt(_k * Tmid / (_mu * _mH))
-        #hs_p, ws_p = H_mid * hs_T / r, H_mid * ws_T / r
-        fz = 0.5 * np.tanh(((z / r) - hs_p) / ws_p) + 0.5
+        H_p = np.sqrt(_k * Tmid / (_mu * _mH)) / omega_Kep(r, np.zeros_like(r))
+        if cfg_dict['selfgrav']:
+            Q = np.sqrt(_k * Tmid / (_mu * _mH)) * \
+                omega_Kep(r, np.zeros_like(r)) / \
+                (np.pi * _G * Sigma_gas(r))
+            H = np.sqrt(np.pi / 2) * (np.pi / (4 * Q)) * \
+                (np.sqrt(1 + 8 * Q**2 / np.pi) - 1) * H_p
+        else:
+            H = H_p
+        fz = 0.5 * np.tanh(((z / r) - a_z * (H / r)) / (w_z * (H / r)) + 0.5
         Tout = (Tmid**4 + fz * Tatm**4)**0.25
         return np.clip(Tout, a_min=Tmin, a_max=Tmax)
 
@@ -59,7 +66,9 @@ def parametric_disk(velax, pars, pars_fixed, quiet=True):
 
     # Set up the abundance function
     def abund(r, z):
-        zr_mask = np.logical_and(z/r <= ab_zrmax, z/r >= ab_zrmin)
+        H_p = np.sqrt(_k * Tmid0 * (r / r0)**qmid / (_mu * _mH)) / \
+              omega_Kep(r, np.zeros_like(r))
+        zr_mask = np.logical_and(z/r <= ab_zrmax * H_p / r, T_gas(r, z) >= Tfrz)
         r_mask  = np.logical_and(r >= (ab_rmin * _AU), r <= (ab_rmax * _AU))
         return np.where(np.logical_and(zr_mask, r_mask), xmol, xmol * depl)
 
@@ -69,7 +78,7 @@ def parametric_disk(velax, pars, pars_fixed, quiet=True):
 
 
     # Compute and quote the total gas mass
-    r_test = np.logspace(-1, 3.5, 2048) * _AU
+    r_test = np.logspace(-1, np.log10(1.1 * r_l), 2048) * _AU
     M_gas = np.trapz(2 * np.pi * r_test * Sigma_gas(r_test), r_test) / _msun
     print('Gas mass of disk = %.4f Msun' % M_gas)
 
@@ -78,15 +87,19 @@ def parametric_disk(velax, pars, pars_fixed, quiet=True):
     struct = radmc_structure(cfg_dict, T_gas, Sigma_gas, omega_Kep, abund,
                              nonthermal_linewidth)
 
-    # Build the datacube
-    cube = struct.get_cube(inc, PA, dist, restfreq, FOV, npix, 
-                           velax=velax, vlsr=vlsr)
+    if struct_only:
+        return 0
+
+    else:
+        # Build the datacube
+        cube = struct.get_cube(inc, PA, dist, restfreq, FOV, npix, 
+                               velax=velax, vlsr=vlsr)
 
 
-    # Pack the cube into a vis_sample SkyImage object and return
-    mod_data = np.fliplr(np.rollaxis(cube, 0, 3))
-    mod_ra  = (FOV / (npix - 1)) * (np.arange(npix) - 0.5 * npix) 
-    mod_dec = (FOV / (npix - 1)) * (np.arange(npix) - 0.5 * npix)
-    freq = restfreq * (1 - velax / sc.c)
+        # Pack the cube into a vis_sample SkyImage object and return
+        mod_data = np.rollaxis(cube, 0, 3)
+        mod_ra  = (FOV / (npix - 1)) * (np.arange(npix) - 0.5 * npix) 
+        mod_dec = (FOV / (npix - 1)) * (np.arange(npix) - 0.5 * npix)
+        freq = restfreq * (1 - velax / sc.c)
 
-    return SkyImage(mod_data, mod_ra, mod_dec, freq, None)
+        return SkyImage(mod_data, mod_ra, mod_dec, freq, None)

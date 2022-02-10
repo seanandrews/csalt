@@ -61,20 +61,29 @@ class inf_dataset:
 
 
 # Data parsing to generate inputs for likelihood function
-def fitdata(inp, vra=None, vcensor=None):
+def fitdata(datafile, vra=None, vcensor=None, nu_rest=230.538e9, chbin=2):
 
-    # Load the metadata and initialize the output dictionary
-    data_dict = np.load(inp.dataname+'.npy', allow_pickle=True).item()
-    nobs = data_dict['nobs']
+    # Load the data from the HDF5 file
+    f = h5py.File(datafile+'.h5', "r")
+
+    # Load the relevant attributes
+    nobs = f.attrs['nobs']
+    f.close()
+
+    # Initialize output data dictionary
     out_dict = {'nobs': nobs}
+
+    # If chbin is a scalar, distribute it over the nobs elements
+    if np.isscalar(chbin):
+        chbin = chbin * np.ones(nobs, dtype=np.int)
+    else:
+        chbin = np.asarray(chbin)
 
     # Loop through each EB
     for i in range(nobs):
 
         # load the data into a dataset object
-        d_ = np.load(inp.dataname+inp._ext+'_EB'+str(i)+'.npz')
-        idata = dataset(d_['um'], d_['vm'], d_['data'], d_['weights'],
-                        d_['nu_TOPO'], d_['nu_LSRK'], d_['tstamp_ID'])
+        idata = HDF_to_dataset(datafile, grp='EB'+str(i)+'/')
 
         # if necessary, distribute weights across spectrum
         if not idata.wgt.shape == idata.vis.shape:
@@ -82,7 +91,7 @@ def fitdata(inp, vra=None, vcensor=None):
             idata.wgt = np.rollaxis(idata.wgt, 1, 0)
 
         # convert the LSRK frequency grid to a velocity grid
-        v_LSRK = sc.c * (1 - idata.nu_LSRK / inp.nu_rest)
+        v_LSRK = sc.c * (1 - idata.nu_LSRK / nu_rest)
 
         # fix direction of desired velocity bounds, based on data format
         if vra is None: vra = [-1e5, 1e5]
@@ -98,8 +107,8 @@ def fitdata(inp, vra=None, vcensor=None):
         ixh = np.abs(v_LSRK[midstamp,:] - vra[1]).argmin()
 
         # reconcile channel set to be evenly divisible by binning factor
-        if ((ixh - ixl + (ixh - ixl) % inp.chbin[i]) < idata.nchan):
-            for j in range((ixh - ixl) % inp.chbin[i]):
+        if ((ixh - ixl + (ixh - ixl) % chbin[i]) < idata.nchan):
+            for j in range((ixh - ixl) % chbin[i]):
                 if not (ixh == idata.nchan-1):
                     ixh += 1
                 elif not (ixl == 0):
@@ -119,10 +128,10 @@ def fitdata(inp, vra=None, vcensor=None):
         iwgt = idata.wgt[:,ixl:ixh,:]
 
         # spectral binning
-        bnchan = np.int(inchan / inp.chbin[i])
-        wt = iwgt.reshape((idata.npol, -1, inp.chbin[i], idata.nvis))
-        bvis = np.average(ivis.reshape((idata.npol, -1, inp.chbin[i], 
-                                        idata.nvis)), weights=wt, axis=2)
+        bnchan = np.int(inchan / chbin[i])
+        wt = iwgt.reshape((idata.npol, -1, chbin[i], idata.nvis))
+        bvis = np.average(ivis.reshape((idata.npol, -1, chbin[i], idata.nvis)), 
+                          weights=wt, axis=2)
         bwgt = np.sum(wt, axis=2)
 
         # channel censoring
@@ -132,7 +141,7 @@ def fitdata(inp, vra=None, vcensor=None):
 
             # approximate velocities of binned channels
             v_ = iv_LSRK[midstamp,:]
-            v_bin = np.average(v_.reshape(-1, inp.chbin[i]), axis=1)
+            v_bin = np.average(v_.reshape(-1, chbin[i]), axis=1)
 
             # identify which (binned) channels are censored (==False)
             cens_chans = np.ones(inchan, dtype='bool')
@@ -143,17 +152,17 @@ def fitdata(inp, vra=None, vcensor=None):
                 ixl = np.abs(iv_LSRK[midstamp,:] - vcens[0]).argmin()
                 ixh = np.abs(iv_LSRK[midstamp,:] - vcens[1]).argmin()
                 cens_chans[ixl:ixh+1] = False
-            cens_chans = np.all(cens_chans.reshape((-1, inp.chbin[i])), axis=1)
+            cens_chans = np.all(cens_chans.reshape((-1, chbin[i])), axis=1)
 
             # set weights --> 0 in censored channels
             bwgt[:,cens_chans == False,:] = 0
            
         # pre-calculate the spectral covariance matrix and its inverse
-        if inp.chbin[i] == 2:
+        if chbin[i] == 2:
             di, odi = (5./16), (3./32)
-        elif inp.chbin[i] == 3:
+        elif chbin[i] == 3:
             di, odi = (1./4), (1./24)
-        elif inp.chbin[i] == 4:
+        elif chbin[i] == 4:
             di, odi = (13./64), (3./128)
         else:
             di, odi = 1, 0      # this is wrong, but maybe useful to test
@@ -180,16 +189,16 @@ def fitdata(inp, vra=None, vcensor=None):
 
 
 
-def HDF_to_dataset(HDF_in):
+def HDF_to_dataset(HDF_in, grp=''):
 
     # Open the HDF file
     _ = h5py.File(HDF_in+'.h5', "r")
 
     # Load the inputs into numpy arrays (convert visibilities to complex)
-    _um, _vm = np.asarray(_['um']), np.asarray(_['vm'])
-    _vis = np.asarray(_['vis_real']) + 1j * np.asarray(_['vis_imag'])
-    _wgts, _stmp = np.asarray(_['weights']), np.asarray(_['tstamp_ID'])
-    _TOPO, _LSRK = np.asarray(_['nu_TOPO']), np.asarray(_['nu_LSRK'])
+    _um, _vm = np.asarray(_[grp+'um']), np.asarray(_[grp+'vm'])
+    _vis = np.asarray(_[grp+'vis_real']) + 1j * np.asarray(_[grp+'vis_imag'])
+    _wgts, _stmp = np.asarray(_[grp+'weights']), np.asarray(_[grp+'tstamp_ID'])
+    _TOPO, _LSRK = np.asarray(_[grp+'nu_TOPO']), np.asarray(_[grp+'nu_LSRK'])
     _.close()
 
     # Return a dataset object

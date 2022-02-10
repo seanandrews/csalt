@@ -7,7 +7,7 @@
     Outputs:
 	- various
 """
-import os, sys, time
+import os, sys, importlib, time
 import numpy as np
 from vis_sample import vis_sample
 from scipy.ndimage import convolve1d
@@ -15,22 +15,25 @@ from scipy.interpolate import interp1d
 import scipy.constants as sc
 import matplotlib.pyplot as plt
 from vis_sample.classes import *
-from parametric_disk import *
 from astropy.io import fits, ascii
+from parametric_disk_CSALT import parametric_disk as par_disk_CSALT
+from parametric_disk_FITS import parametric_disk as par_disk_FITS
 
-_pc = 3.09e18
 
-
-def cube_to_fits(sky_image, fitsout, RA=0., DEC=0.):
+def cube_to_fits(sky_image, fitsout, RA=0., DEC=0., restfreq=230.538e9):
 
     # revert to proper formatting
-    cube = np.fliplr(np.rollaxis(sky_image.data, -1))
+    cube = np.rollaxis(np.fliplr(sky_image.data), -1)
 
     # extract coordinate information
     im_nfreq, im_ny, im_nx = cube.shape
     pixsize_x = np.abs(np.diff(sky_image.ra)[0])
     pixsize_y = np.abs(np.diff(sky_image.dec)[0])
-    CRVAL3, CDELT3 = sky_image.freqs[0], np.diff(sky_image.freqs)[0]
+    CRVAL3 = sky_image.freqs[0]
+    if len(sky_image.freqs) > 1:
+        CDELT3 = np.diff(sky_image.freqs)[0]
+    else:
+        CDELT3 = 1
 
     # generate the primary HDU
     hdu = fits.PrimaryHDU(np.float32(cube))
@@ -67,7 +70,7 @@ def cube_to_fits(sky_image, fitsout, RA=0., DEC=0.):
 
     header['SPECSYS'] = 'LSRK'
     header['VELREF'] = 257
-    header['RESTFREQ'] = 345.7959899e9
+    header['RESTFREQ'] = restfreq
     header['BSCALE'] = 1.
     header['BZERO'] = 0.
     header['BUNIT'] = 'JY/PIXEL'
@@ -101,32 +104,32 @@ def radmc_to_fits(path_to_image, fitsout, pars_fixed):
 
     # erg cm^-2 s^-1 Hz^-1 str^-1 --> Jy / pixel
     cube = np.reshape(imvals[nlam:],[nlam, im_ny, im_nx])
-    cube *= 1e23 * pixsize_x * pixsize_y / (dist * _pc)**2
+    cube *= 1e23 * pixsize_x * pixsize_y / (dist * 3.0857e18)**2
 
     # Pack the cube into a vis_sample SkyImage object and FITS file
-    mod_data = np.fliplr(np.rollaxis(cube, 0, 3))
+    mod_data = np.rollaxis(cube, 0, 3)
     mod_ra  = (FOV / (npix - 1)) * (np.arange(npix) - 0.5 * npix)
     mod_dec = (FOV / (npix - 1)) * (np.arange(npix) - 0.5 * npix)
     freq = sc.c / (lams * 1e-6)
 
-    #print(mod_data.shape)
-    #sys.exit()
-
-    skyim = SkyImage(mod_data, mod_ra, mod_dec, freq[::-1], None)
-    foo = cube_to_fits(skyim, fitsout, 240., -40.)
+    skyim = SkyImage(mod_data, mod_ra, mod_dec, freq, None)
+    foo = cube_to_fits(skyim, fitsout, 240., -30., restfreq=restfreq)
 
     return 
     
 
 
 
-def vismodel_full(pars, fixed, dataset, 
+def vismodel_full(pars, fixed, dataset, mtype='CSALT',
                   chpad=3, oversample=None, noise_inject=None):
 
     ### - Prepare inputs
     # Parse fixed parameters
     restfreq, FOV, npix, dist, cfg_dict = fixed
     npars = len(pars)
+
+    # Load appropriate model for cube calculation
+    pd = importlib.import_module('parametric_disk_'+mtype)
 
     # Spatial frequencies to lambda units
     uu = dataset.um * np.mean(dataset.nu_TOPO) / sc.c
@@ -174,7 +177,7 @@ def vismodel_full(pars, fixed, dataset,
         sigma_out = 1e-3 * noise_inject * np.sqrt(dataset.npol * dataset.nvis)
 
         # Scale to account for spectral oversampling and SRF convolution
-        sigma_noise = sigma_out * np.sqrt(oversample * 8./3.)
+        sigma_noise = 1.25 * sigma_out * np.sqrt(oversample) # * 8./3.)
 
         # Random Gaussian noise draws: note RE/IM separated for speed later
         noise = np.random.normal(0, sigma_noise, 
@@ -191,7 +194,7 @@ def vismodel_full(pars, fixed, dataset,
         print('timestamp '+str(itime+1)+' / '+str(dataset.nstamps))
 
         # create a model cube
-        cube = parametric_disk(v_LSRK[itime,:], pars, fixed)
+        cube = pd.parametric_disk(v_LSRK[itime,:], pars, fixed)
 
         # indices for this timestamp only
         ixl = np.min(np.where(dataset.tstamp == itime))
@@ -246,7 +249,7 @@ def vismodel_full(pars, fixed, dataset,
 
 
 
-def vismodel_def(pars, fixed, dataset, 
+def vismodel_def(pars, fixed, dataset, mtype='CSALT',
                  imethod='cubic', return_holders=False, chpad=3, 
                  noise_inject=None):
 
@@ -254,6 +257,9 @@ def vismodel_def(pars, fixed, dataset,
     # Parse fixed parameters
     restfreq, FOV, Npix, dist, cfg_dict = fixed
     npars = len(pars)
+
+    # Load appropriate model for cube calculation
+    pd = importlib.import_module('parametric_disk_'+mtype)
 
     # Spatial frequencies to lambda units
     uu = dataset.um * np.mean(dataset.nu_TOPO) / sc.c
@@ -278,10 +284,7 @@ def vismodel_def(pars, fixed, dataset,
     v_grid = sc.c * (1 - nu_LSRK / restfreq)
 
     # generate a model cube
-    mcube = parametric_disk(v_model, pars, fixed)
-
-    # save a FITS version of the cube
-    cube_to_fits(mcube, 'tmp_cube.fits', RA=240., DEC=-40.) 
+    mcube = pd.parametric_disk(v_model, pars, fixed)
 
     # sample the FT of the cube onto the observed spatial frequencies
     mvis_, gcf, corr = vis_sample(imagefile=mcube, uu=uu, vv=vv, 
@@ -377,7 +380,7 @@ def vismodel_iter(pars, fixed, dataset, gcf, corr, imethod='cubic', chpad=3):
     v_grid = sc.c * (1 - nu_LSRK / restfreq)
 
     # generate a model cube
-    mcube = parametric_disk(v_model, pars, fixed)
+    mcube = par_disk_CSALT(v_model, pars, fixed)
 
     # sample the FT of the cube onto the observed spatial frequencies
     mvis = vis_sample(imagefile=mcube, mu_RA=pars[-2], mu_DEC=pars[-1], 
@@ -406,6 +409,42 @@ def vismodel_iter(pars, fixed, dataset, gcf, corr, imethod='cubic', chpad=3):
 
 
 
+def vismodel_naif(pars, fixed, dataset, gcf=None, corr=None, 
+                  return_holders=False):
+
+    ### - Prepare inputs
+    # Parse fixed parameters
+    restfreq, FOV, Npix, dist, cfg_dict = fixed
+    npars = len(pars)
+
+    # LSRK velocities 
+    v_model = sc.c * (1 - dataset.nu_LSRK[0,:] / restfreq)
+
+    # generate a model cube
+    mcube = par_disk_CSALT(v_model, pars, fixed)
+
+    # sample the FT of the cube onto the observed spatial frequencies
+    if return_holders:
+        uu = dataset.um * np.mean(dataset.nu_TOPO) / sc.c
+        vv = dataset.vm * np.mean(dataset.nu_TOPO) / sc.c
+        mvis_, gcf, corr = vis_sample(imagefile=mcube, uu=uu, vv=vv,
+                                      mu_RA=pars[-2], mu_DEC=pars[-1],
+                                      return_gcf=True, return_corr_cache=True,
+                                      mod_interp=False)
+        mvis = mvis_.T
+        return mvis, gcf, corr
+    else:
+        mvis = vis_sample(imagefile=mcube, mu_RA=pars[-2], mu_DEC=pars[-1],
+                          gcf_holder=gcf, corr_cache=corr, mod_interp=False).T
+
+        # populate both polarizations
+        mvis = np.tile(mvis, (2, 1, 1))
+
+        # return the model visibilities
+        return mvis
+
+
+
 def vismodel_FITS(pars, fixed, dataset,
                   imethod='cubic', return_holders=False, chpad=3,
                   noise_inject=None):
@@ -416,7 +455,7 @@ def vismodel_FITS(pars, fixed, dataset,
     npars = len(pars)
 
     # Ingest the model cube 
-    mcube = parametric_disk([0], pars, fixed)
+    mcube = par_disk_FITS([0], pars, fixed)
 
     # Calculate the model cube velocities
     v_model = sc.c * (1 - mcube.freqs / restfreq)

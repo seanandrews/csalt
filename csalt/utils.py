@@ -3,6 +3,7 @@ import numpy as np
 import scipy.constants as sc
 from astropy.io import fits
 import matplotlib.pyplot as plt
+import astropy.visualization as av
 sys.path.append('configs/')
 
 
@@ -198,3 +199,180 @@ def img_cube(in_MS, out_img, cfg_file, mask='', masktype='kep'):
         os.system('rm -rf '+inp.casalogs_dir+'imaging.log')
         os.system('casa --nologger --logfile '+inp.casalogs_dir + \
                   'imaging.log '+'-c csalt/CASA_scripts/imaging.py')
+
+
+
+def radmc_loader(dirname, filename):
+
+    if dirname[-1] != '/': dirname += '/'
+
+    # load the gridpoints gridpoints
+    _ = np.loadtxt(dirname+'amr_grid.inp', skiprows=5, max_rows=1)
+    nr, nt = np.int(_[0]), np.int(_[1])
+    Rw = np.loadtxt(dirname+'amr_grid.inp', skiprows=6, max_rows=nr+1)
+    Tw = np.loadtxt(dirname+'amr_grid.inp', skiprows=nr+7, max_rows=nt+1)
+    xx = 0.5*(Rw[:-1] + Rw[1:]) / (sc.au * 1e2)
+    yy = np.tan(0.5 * np.pi - 0.5*(Tw[:-1] + Tw[1:]))
+
+    # load the structure of interest
+    if filename == 'gas_velocity':
+        zz = np.reshape(np.loadtxt(dirname+filename+'.inp', skiprows=2, 
+                                   usecols=(2)), (nt, nr))
+        zz *= 0.01
+    else:
+        zz = np.reshape(np.loadtxt(dirname+filename+'.inp', skiprows=2), 
+                        (nt, nr))
+
+    return xx, yy, zz
+
+
+def radmc_plotter(dirname, filename, xlims=None, ylims=None, zlims=None,
+                  xscl=None, yscl=None, zscl=None, zlevs=None,
+                  cmap='plasma', lbl='undefined'):
+
+    if dirname[-1] != '/': dirname += '/'
+
+    # configure plotting routines
+    plt.style.use('default')
+    plt.rcParams.update({'font.size': 12})
+
+    # load contents
+    xx, yy, zz = radmc_loader(dirname, filename)
+    if zscl == 'log': zz = np.log10(zz)
+
+    # adjust limits as appropriate
+    if xlims is None:
+        xlims = [xx.min(), xx.max()]
+    if ylims is None:
+        ylims = [yy.min(), yy.max()]
+    if zlims is None:
+        zlims = [zz.min(), zz.max()]
+
+    # adjust scales as appropriate
+    if xscl is None:
+        xscl = 'linear'
+    if yscl is None:
+        yscl = 'linear'
+
+    # assign levels if not provided
+    if zlevs is None:
+        zlevs = np.linspace(zlims[0], zlims[1], 50)
+
+    # configure plot
+    fig, ax = plt.subplots(constrained_layout=True)
+    axpos = ax.get_position()
+
+    # plot the structure
+    im = ax.contourf(xx, yy, zz, levels=zlevs, cmap=cmap)
+
+    # figure layouts
+    ax.set_xlim(xlims)
+    ax.set_ylim(ylims)
+    ax.set_xscale(xscl)
+    ax.set_yscale(yscl)
+    ax.set_xlabel('$r$  (AU)')
+    ax.set_ylabel('$\\approx z \,\, / \,\, r$')
+
+    # add the colorbars
+    fig.colorbar(im, ax=ax, label=lbl)
+
+    fig.savefig(dirname+filename+'.png')
+    fig.clf()
+
+    return
+
+
+def radmc_slice_plotter(dirname, filename, xslice=None, yslice=None,
+                        xlims=None, ylims=None, zlims=None,
+                        xscl=None, yscl=None, zscl=None,
+                        colors=None, lbl='undefined'):
+
+    if dirname[-1] != '/': dirname += '/'
+
+    # Check slices
+    if np.logical_and(xslice is None, yslice is None):
+        print('\nIf you ask for nothing, you get nothing.\n')
+        return
+    if np.logical_and(xslice is not None, np.isscalar(xslice)):
+        xslice = [xslice]
+    if np.logical_and(yslice is not None, np.isscalar(yslice)):
+        yslice = [yslice]
+
+    # configure plotting routines
+    plt.style.use('default')
+    plt.rcParams.update({'font.size': 12})
+
+    # load contents
+    xx, yy, zz = radmc_loader(dirname, filename)
+
+    # adjust limits as appropriate
+    if xlims is None:
+        xlims = [xx.min(), xx.max()]
+    if ylims is None:
+        ylims = [yy.min(), yy.max()]
+    if zlims is None:
+        zlims = [zz.min(), zz.max()]
+
+    # adjust scales as appropriate
+    if xscl is None:
+        xscl = 'linear'
+    if yscl is None:
+        yscl = 'linear'
+    if zscl is None:
+        zscl = 'linear'
+
+    # choose colors if not provided
+    if colors is None:
+        colors = plt.get_cmap('tab10')
+
+    # Vertical slice(s) -- i.e., fixed R -- plotted together
+    if xslice is not None:
+
+        # configure plot
+        fig, ax = plt.subplots(constrained_layout=True)
+
+        # plot the slices
+        for ir in range(len(xslice)):
+            # find nearest radius (index)
+            rix = np.abs(xx - xslice[ir]).argmin()
+
+            # plot the slice
+            ax.plot(yy, zz[:, rix], '-', color=colors(ir))
+
+        # figure layouts
+        ax.set_xlim(ylims)
+        ax.set_xscale(yscl)
+        ax.set_xlabel('$\\approx z \,\, / \,\, r$')
+        ax.set_ylim(zlims)
+        ax.set_yscale(zscl)
+        ax.set_ylabel(lbl)
+
+        fig.savefig(dirname+filename+'_vslice.png')
+        fig.clf()
+
+    # Radial slice(s) -- i.e., fixed z/r -- plotted together
+    if yslice is not None:
+
+        # configure plot
+        fig, ax = plt.subplots(constrained_layout=True)
+
+        # plot the slices
+        for iz in range(len(yslice)):
+            # find nearest z/r (index)
+            zix = np.abs(yy - yslice[iz]).argmin()
+
+            # plot the slice
+            ax.plot(xx, zz[zix, :], '-', color=colors(iz))
+
+        # figure layouts
+        ax.set_xlim(xlims)
+        ax.set_xscale(xscl)
+        ax.set_xlabel('$r$  (AU)')
+        ax.set_ylim(zlims)
+        ax.set_yscale(zscl)
+        ax.set_ylabel(lbl)
+
+        fig.savefig(dirname+filename+'_rslice.png')
+        fig.clf()
+
+    return

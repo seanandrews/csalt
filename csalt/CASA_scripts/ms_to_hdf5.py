@@ -27,7 +27,10 @@ def ms_to_hdf5(MS_in, HDF_out, append=False, groupname=None):
         else:
             if groupname[-1] != '/': groupname += '/'
     else:
-        groupname = ''
+        if groupname == None:
+            groupname = ''
+        else:
+            if groupname[-1] != '/': groupname += '/'
 
     # Acquire MS information (for easier use external to CASA)
     tb.open(MS_in+'.ms')
@@ -62,6 +65,7 @@ def ms_to_hdf5(MS_in, HDF_out, append=False, groupname=None):
     else:
         os.system('rm -rf '+HDF_out+'.h5')
         outp = h5py.File(HDF_out+'.h5', "w")
+        outp.attrs['nobs'] = 1
     outp.create_dataset(groupname+'um', data=u)
     outp.create_dataset(groupname+'vm', data=v)
     outp.create_dataset(groupname+'vis_real', data=data.real)

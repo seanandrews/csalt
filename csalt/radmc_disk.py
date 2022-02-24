@@ -67,17 +67,37 @@ class radmc_setup:
         # radial grid in [cm]
         self.r_in  = args["r_min"] * _AU
         self.r_out = args["r_max"] * _AU
-        #self.r_walls = np.logspace(np.log10(self.r_in), np.log10(self.r_out),
-        #                           self.nr+1)
 
-        ### temporarily add cells around "edge"
-        rlog = np.logspace(np.log10(self.r_in), np.log10(self.r_out), self.nr+1)
-        r_l = 225 * _AU
-        ixl, ixh = np.abs(rlog - r_l).argmin() - 1, np.abs(rlog - r_l).argmin()
-        rint = np.linspace(rlog[ixl], rlog[ixh], 20)
-        self.r_walls = np.concatenate((rlog[:ixl], rint, rlog[ixh+1:]))
+        # set initial grid
+        r_ = np.logspace(np.log10(self.r_in), np.log10(self.r_out), self.nr+1)
+
+        # refinement if requested
+        if args["rrefine"]:
+            rref_i, rref_o = args["rref_i"], args["rref_o"]
+            nrref, rref_scl = args["nrref"], args["rref_scl"]
+            for ir in range(len(rref_i)):
+                # identify initial gridpoints just below / above ref bounds
+                rixl = np.argwhere(r_ <= (rref_i[ir] * _AU)).max()
+                rixh = np.argwhere(r_ >= (rref_o[ir] * _AU)).min()
+
+                # set the refined sub-grid
+                if rref_scl[ir] == 'lin':
+                    # if linear, respect the implied updated resolution
+                    requested_res = (rref_o[ir] - rref_i[ir]) / nrref[ir]
+                    actual_dr = (r_[rixh] - r_[rixl]) / _AU
+                    Nsub = np.int(actual_dr / requested_res)
+                    rsub = np.linspace(r_[rixl], r_[rixh], Nsub)
+                    r_ = np.concatenate((r_[:rixl], rsub, r_[rixh+1:]))
+                elif rref_scl[ir] == 'log':
+                    rsub = np.logspace(np.log10(r_[rixl]), np.log10(r_[rixh]),
+                                       nrref[ir])
+                    r_ = np.concatenate((r_[:rixl], rsub, r_[rixh+1:]))
+                else:
+                    print('You want refinement, but you did not specify\n' +\
+                          'a valid refinement scaling.  Nothing was done.')
+
+        self.r_walls = r_
         self.nr = self.r_walls.size - 1
-
         self.r_centers = np.average([self.r_walls[:-1], self.r_walls[1:]],
                                     axis=0)
         assert self.r_centers.size == self.nr
@@ -280,6 +300,7 @@ class radmc_structure:
         self.setup = cfg_dict["setup_params"]
         self.do_vprs = cfg_dict["dPdr"]
         self.do_vsg = cfg_dict["selfgrav"]
+        self.do_isoz = cfg_dict["isoz"]
         self.func_temperature = func_temperature
         self.func_sigma = func_sigma
         self.func_omega = func_omega
@@ -342,61 +363,70 @@ class radmc_structure:
         """
         calculate the 2-d density structure in vertical hydrostatic equilibrium
         """
-        # loop through cylindrical coordinates (ugh)
-        self.rho_gas = np.zeros((self.nt, self.nr))
-        for i in range(self.nr):
-            for j in range(self.nt):
-                # cylindrical coordinates
-                r, z = self.rcyl[j,i], self.zcyl[j,i]
+        # Analytic, vertically isothermal case
+        if self.do_isoz:
+            Trz = self.func_temperature(self.rcyl, self.zcyl)
+            Hp = np.sqrt(_k * Trz / (_mu * _mH)) / \
+                 self.func_omega(self.rcyl, 0*self.zcyl)
+            self.rho_gas = self.func_sigma(self.rcyl) * \
+                           np.exp(-0.5 * (self.zcyl / Hp)**2) / \
+                           (np.sqrt(2 * np.pi) * Hp)
 
-                # define a special z grid for integration (zg)
-                zmin, zmax, nz = 0.1, 5.*r, 1024
-                zg = np.logspace(np.log10(zmin), np.log10(zmax + zmin), nz)
-                zg -= zmin
+        # Generic, vertical temperature gradient case
+        else:
+            # loop through cylindrical coordinates (ugh)
+            self.rho_gas = np.zeros((self.nt, self.nr))
+            for i in range(self.nr):
+                for j in range(self.nt):
+                    # cylindrical coordinates
+                    r, z = self.rcyl[j,i], self.zcyl[j,i]
 
-                # if z >= zmax, return the minimum density
-                if (z >= zmax):
-                    self.rho_gas[j,i] = _min * _mH * _mu
-                else:
-                    # vertical temperature gradient
-                    Tz = self.func_temperature(r, zg)
-                    dT, dz = np.diff(np.log(Tz)), np.diff(zg)
-                    dlnTdz = np.append(dT, dT[-1]) / np.append(dz, dz[-1])
+                    # define a special z grid for integration (zg)
+                    zmin, zmax, nz = 0.1, 5.*r, 1024
+                    zg = np.logspace(np.log10(zmin), np.log10(zmax + zmin), nz)
+                    zg -= zmin
 
-                    # scale height
-                    Hp = np.sqrt(_k * Tz / (_mu * _mH)) / \
-                         self.func_omega(r, zg)
-                    if self.do_vsg:
-                        Q = np.sqrt(_k * Tz / (_mu * _mH)) * \
-                            self.func_omega(r, zg) / \
-                            (np.pi * _G * self.func_sigma(r))
-                        H = np.sqrt(np.pi / 2) * (np.pi / (4 * Q)) * \
-                            (np.sqrt(1 + 8 * Q**2 / np.pi) - 1) * Hp
+                    # if z >= zmax, return the minimum density
+                    if (z >= zmax):
+                        self.rho_gas[j,i] = _min * _mH * _mu
                     else:
-                        H = Hp
+                        # vertical temperature gradient
+                        Tz = self.func_temperature(r, zg)
+                        dT, dz = np.diff(np.log(Tz)), np.diff(zg)
+                        dlnTdz = np.append(dT, dT[-1]) / np.append(dz, dz[-1])
 
-                    # vertical gravity
-                    gz = zg / H**2
-#                    gz = self.func_omega(r, zg)**2 * zg
-#                    gz /= (_k * Tz / (_mu * _mH))
+                        # scale height
+                        Hp = np.sqrt(_k * Tz / (_mu * _mH)) / \
+                             self.func_omega(r, zg)
+                        if self.do_vsg:
+                            Q = np.sqrt(_k * Tz / (_mu * _mH)) * \
+                                self.func_omega(r, zg) / \
+                                (np.pi * _G * self.func_sigma(r))
+                            H = np.sqrt(np.pi / 2) * (np.pi / (4 * Q)) * \
+                                (np.sqrt(1 + 8 * Q**2 / np.pi) - 1) * Hp
+                        else:
+                            H = Hp
 
-                    # vertical density gradient
-                    dlnpdz = -dlnTdz - gz
+                        # vertical gravity
+                        gz = zg / H**2
 
-                    # numerical integration
-                    lnp = integrate.cumtrapz(dlnpdz, zg, initial=0)
-                    rho0 = np.exp(lnp)
+                        # vertical density gradient
+                        dlnpdz = -dlnTdz - gz
 
-                    # normalize
-                    rho = 0.5 * rho0 * self.func_sigma(r)
-                    rho /= integrate.trapz(rho0, zg)
+                        # numerical integration
+                        lnp = integrate.cumtrapz(dlnpdz, zg, initial=0)
+                        rho0 = np.exp(lnp)
 
-                    # interpolator to go back to the original gridpoint
-                    f = interp1d(zg, rho)
+                        # normalize
+                        rho = 0.5 * rho0 * self.func_sigma(r)
+                        rho /= integrate.trapz(rho0, zg)
 
-                    # gas density at specified height
-                    min_rho = _min * _mu * _mH
-                    self.rho_gas[j,i] = np.max([f(z), min_rho])
+                        # interpolator to go back to the original gridpoint
+                        f = interp1d(zg, rho)
+
+                        # gas density at specified height
+                        min_rho = _min * _mu * _mH
+                        self.rho_gas[j,i] = np.max([f(z), min_rho])
 
         if write:
             np.savetxt(self.modelname+'/gas_density.inp', 
@@ -473,11 +503,9 @@ class radmc_structure:
 
         abund_ = self.func_abund(self.rcyl, self.zcyl)
         self.nmol = abund_ * self.rho_gas / (_mu * _mH)
-        print(self.nmol.min())
 
         # kinematics mask
         self.nmol[self.vmask] = 0.
-        print(self.nmol.min())
 
         if write:
             np.savetxt(self.modelname+'/numberdens_'+self.smol+'.inp',

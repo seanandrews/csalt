@@ -4,6 +4,7 @@ import scipy.constants as sc
 from astropy.io import fits
 import matplotlib.pyplot as plt
 import astropy.visualization as av
+import cmasher as cmr
 sys.path.append('configs/')
 
 
@@ -206,13 +207,13 @@ def radmc_loader(dirname, filename):
 
     if dirname[-1] != '/': dirname += '/'
 
-    # load the gridpoints gridpoints
+    # load the gridpoints
     _ = np.loadtxt(dirname+'amr_grid.inp', skiprows=5, max_rows=1)
     nr, nt = np.int(_[0]), np.int(_[1])
     Rw = np.loadtxt(dirname+'amr_grid.inp', skiprows=6, max_rows=nr+1)
     Tw = np.loadtxt(dirname+'amr_grid.inp', skiprows=nr+7, max_rows=nt+1)
-    xx = 0.5*(Rw[:-1] + Rw[1:]) / (sc.au * 1e2)
-    yy = np.tan(0.5 * np.pi - 0.5*(Tw[:-1] + Tw[1:]))
+    xx = np.average([Rw[:-1], Rw[1:]], axis=0) / (sc.au * 1e2)
+    yy = 0.5 * np.pi - np.average([Tw[:-1], Tw[1:]], axis=0)
 
     # load the structure of interest
     if filename == 'gas_velocity':
@@ -228,7 +229,9 @@ def radmc_loader(dirname, filename):
 
 def radmc_plotter(dirname, filename, xlims=None, ylims=None, zlims=None,
                   xscl=None, yscl=None, zscl=None, zlevs=None,
-                  cmap='plasma', lbl='undefined'):
+                  cmap='plasma', lbl='undefined', overlay=None, 
+                  olevs=None, ofx=None, ofy=None, ofsty='-', ofcol='k',
+                  show_grid=False):
 
     if dirname[-1] != '/': dirname += '/'
 
@@ -265,13 +268,34 @@ def radmc_plotter(dirname, filename, xlims=None, ylims=None, zlims=None,
     # plot the structure
     im = ax.contourf(xx, yy, zz, levels=zlevs, cmap=cmap)
 
+    # overlay contours if requested
+    if overlay is not None:
+        if not isinstance(overlay, list): 
+            overlay = [overlay]
+            olevs = [olevs]
+        for io in range(len(overlay)):
+            print(overlay[io])
+            ox, oy, oz = radmc_loader(dirname, overlay[io])
+            ax.contour(ox, oy, oz, levels=olevs[io])
+
+    # overlay annotation profile(s) if requested
+    if np.logical_and(ofx is not None, ofy is not None):
+        ax.plot(ofx, ofy, ofsty, color=ofcol)
+
+    # show grid if you want
+    if show_grid:
+        for ir in range(len(xx)):
+            ax.plot([xx[ir], xx[ir]], ylims, 'gray', alpha=0.5)
+        for it in range(len(yy)):
+            ax.plot(xlims, [yy[it], yy[it]], 'gray', alpha=0.5)
+
     # figure layouts
     ax.set_xlim(xlims)
     ax.set_ylim(ylims)
     ax.set_xscale(xscl)
     ax.set_yscale(yscl)
-    ax.set_xlabel('$r$  (AU)')
-    ax.set_ylabel('$\\approx z \,\, / \,\, r$')
+    ax.set_xlabel('$R$  (AU)')
+    ax.set_ylabel('$\pi \, / \, 2 - \Theta$')
 
     # add the colorbars
     fig.colorbar(im, ax=ax, label=lbl)

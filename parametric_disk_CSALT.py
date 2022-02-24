@@ -18,14 +18,13 @@ import scipy.constants as sc
 import numpy as np
 from vis_sample.classes import SkyImage
 import matplotlib.pyplot as plt
-
 import sys
 
 
 
-def tapered_powerlaw(r, y_10, y_q, y_tap, y_exp):
+def tapered_powerlaw(r, y_0, r_0, y_q, y_tap, y_exp):
     """Exponentially tapered power law."""
-    return y_10 * (r / 10.0)**y_q * np.exp(-(r / y_tap)**y_exp)
+    return y_0 * (r / r_0)**y_q * np.exp(-(r / y_tap)**y_exp)
 
 
 def parametric_disk(velax, pars, pars_fixed, quiet=True):
@@ -41,7 +40,8 @@ def parametric_disk(velax, pars, pars_fixed, quiet=True):
     # Parse the inputs
     restfreq, FOV, npix, dist, cfg_dict = pars_fixed
     inc, PA, mstar, r_l, z_10, z_q, Tb_10, Tb_q, Tbmax_b, dV_10, \
-        tau_10, tau_q, vlsr, dx, dy = pars
+        logtau_10, tau_q, vlsr, dx, dy = pars
+
 
     # Fixed and adjusted parameters
     dV_q = 0.5 * Tb_q
@@ -67,7 +67,7 @@ def parametric_disk(velax, pars, pars_fixed, quiet=True):
     # are symmetric.
     def z_f(r):
         """Emission surface of the front side of the disk."""
-        return tapered_powerlaw(r, z_10, z_q, z_tap, z_exp)
+        return tapered_powerlaw(r, z_10, 1., z_q, z_tap, z_exp)
 
     def z_b(r):
         """Emission surface for the back side of the disk."""
@@ -84,15 +84,15 @@ def parametric_disk(velax, pars, pars_fixed, quiet=True):
     # described by an optical depth, a line width, a peak line brightness.
     def Tb(r):
         """Peak brightness profile in [K]."""
-        return tapered_powerlaw(r, Tb_10, Tb_q, Tb_tap, Tb_exp)
+        return tapered_powerlaw(r, Tb_10, 10., Tb_q, Tb_tap, Tb_exp)
 
     def dV(r):
         """Doppler linewidth profile in [m/s]."""
-        return tapered_powerlaw(r, dV_10, dV_q, dV_tap, dV_exp)
+        return tapered_powerlaw(r, dV_10, 10., dV_q, dV_tap, dV_exp)
 
     def tau(r):
         """Optical depth profile."""
-        return tapered_powerlaw(r, tau_10, tau_q, tau_tap, tau_exp)
+        return tapered_powerlaw(r, 10**logtau_10, 10., tau_q, tau_tap, tau_exp)
 
 
     # For each of these values we can set limits which can be a useful way to
@@ -110,7 +110,7 @@ def parametric_disk(velax, pars, pars_fixed, quiet=True):
     # curve, although in principle anything can be used.
     def vkep(r):
         """Keplerian rotational velocity profile in [m/s]."""
-        r_m, z_m = r * sc.au, z_f(r) * sc.au
+        r_m, z_m = r * sc.au, z_f(r / dist) * dist * sc.au
         vv = np.sqrt(sc.G * mstar * 1.98847e30 * r_m**2 / \
                      np.power(r_m**2 + z_m**2, 1.5))
         return vv

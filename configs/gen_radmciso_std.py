@@ -114,7 +114,7 @@ r_l   = 225.
 xmol  = 1e-5
 depl  = 1e-20
 Tfrz  = 20.
-zrmax = 2.5
+zrmax = 1.0	#2.5
 rmin  = 0.1
 rmax  = 1.1 * r_l
 

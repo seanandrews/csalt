@@ -98,13 +98,13 @@ r_l   = 225.
 
 T0    = 150.
 q     = -0.5
-Tmaxb = 20.
+Tmaxb = 1000
 
-z0    = 0.3773899533291711	#0.267
+z0    = (1./2.5) * 0.8 * 0.3773899533291711	#0.267
 psi   = (3 + q) / 2.
 
-sigV0 = np.sqrt(2 * sc.k * T0 / (28 * (sc.m_p + sc.m_e)))	
-logtau0 = np.log10(20000.)
+sigV0 = np.sqrt(2 * sc.k * 150 / (28 * (sc.m_p + sc.m_e)))	
+logtau0 = np.log10(700.)
 ppp   = -1.
 Vsys  = 5.0e3
 dx    = 0.

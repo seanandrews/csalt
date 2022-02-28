@@ -69,8 +69,8 @@ def parametric_disk(velax, pars, pars_fixed, struct_only=False, quiet=True):
     def abund(r, z):
         H_p = np.sqrt(_k * Tmid0 * (r / r0)**qmid / (_mu * _mH)) / \
               omega_Kep(r, np.zeros_like(r))
-        #z_mask = np.logical_and(z <= ab_zrmax * H_p, T_gas(r, z) >= Tfrz)
-        z_mask = np.logical_and(z <= ab_zrmax * H_p, z >= 0.8 * ab_zrmax * H_p)
+        z_mask = np.logical_and(z <= ab_zrmax * H_p, T_gas(r, z) >= Tfrz)
+        #z_mask = np.logical_and(z <= ab_zrmax * H_p, z >= 0.7 * ab_zrmax * H_p)
         r_mask = np.logical_and(r >= (ab_rmin * _AU), r <= (ab_rmax * _AU))
         return np.where(np.logical_and(z_mask, r_mask), xmol, xmol * depl)
 

@@ -158,7 +158,7 @@ setup_params = { 'incl_dust': 0, 'incl_lines': 1, 'nphot': 10000000,
 
 cfg_dict = {'radmcname': radmcname,
             'grid_params': grid_params, 'setup_params': setup_params,
-            'dPdr': False, 'selfgrav': False}
+            'isoz': False, 'dPdr': False, 'selfgrav': False}
 
 
 

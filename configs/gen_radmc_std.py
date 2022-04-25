@@ -95,21 +95,21 @@ V_bounds = [5.0e3-10e3, 5.0e3+10e3]
     INPUT MODEL PARAMETERS:
 
 """
-incl  = 5.
-PA    = 90.
+incl  = 40.
+PA    = 130.
 mstar = 1.0
 
 Tmid0 = 150.	
 Tatm0 = 150. 
 qmid  = -0.5
 qatm  = -0.5
-a_z = 2.00
-w_z = 0.05
+a_z = 1.75
+w_z = 0.25
 
 Sig0  = 19.3
 p1    = -1.0
 p2    = np.inf
-r_l   = 225.
+r_l   = 250.
 
 xmol  = 1e-4
 depl  = 1e-20
@@ -134,6 +134,15 @@ Npix = [256]			 		# number of pixels per FOV
 dist = 150.					# distance (pc)
 
 
+
+# Printout the top of the CO emission layer at 1 AU
+cs_ = np.sqrt(sc.k * Tmid0 * (1.0*dist / 10)**qmid / (2.37 * (sc.m_p + sc.m_e)))
+om_ = np.sqrt(sc.G * mstar * 1.989e30 / (1.0*dist * sc.au)**3)
+zCO = zrmax * (cs_ / om_) / (1.0*dist * sc.au)
+print('zCO = {:1.4} (r / 1") ** {:1.3}'.format(zCO, (3 + qmid)/2))
+
+
+
 # instantiate RADMC-3D parameters
 grid_params = { 'spatial': {'nr': 256, 'nt': 128, 'r_min': 0.1, 'r_max': 300,
                             'rrefine': False },
@@ -147,7 +156,7 @@ setup_params = { 'incl_dust': 0, 'incl_lines': 1, 'nphot': 10000000,
 
 cfg_dict = {'radmcname': radmcname,
             'grid_params': grid_params, 'setup_params': setup_params,
-            'isoz': False, 'dPdr': False, 'selfgrav': False}
+            'isoz': True, 'dPdr': False, 'selfgrav': False}
 
 
 

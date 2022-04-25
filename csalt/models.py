@@ -177,7 +177,7 @@ def vismodel_full(pars, fixed, dataset, mtype='CSALT',
         sigma_out = 1e-3 * noise_inject * np.sqrt(dataset.npol * dataset.nvis)
 
         # Scale to account for spectral oversampling and SRF convolution
-        sigma_noise = 1.25 * sigma_out * np.sqrt(oversample) # * 8./3.)
+        sigma_noise = sigma_out * np.sqrt(oversample * 8./3.)
 
         # Random Gaussian noise draws: note RE/IM separated for speed later
         noise = np.random.normal(0, sigma_noise, 
@@ -445,6 +445,53 @@ def vismodel_naif(pars, fixed, dataset, gcf=None, corr=None,
 
 
 
+def vismodel_naif_wdoppcorr(pars, fixed, dataset, gcf=None, corr=None,
+                            return_holders=False, imethod='cubic'):
+
+    ### - Prepare inputs
+    # Parse fixed parameters
+    restfreq, FOV, Npix, dist, cfg_dict = fixed
+    npars = len(pars)
+
+    # LSRK velocities 
+    mid_stamp = np.int(nu_LSRK.shape[0] / 2)
+    v_model = sc.c * (1 - dataset.nu_LSRK[mid_stamp,:] / restfreq)
+    v_grid = sc.c * (1 - dataset.nu_LSRK / restfreq)
+
+    # generate a model cube
+    mcube = par_disk_CSALT(v_model, pars, fixed)
+
+    # sample the FT of the cube onto the observed spatial frequencies
+    if return_holders:
+        uu = dataset.um * np.mean(dataset.nu_TOPO) / sc.c
+        vv = dataset.vm * np.mean(dataset.nu_TOPO) / sc.c
+        mvis_, gcf, corr = vis_sample(imagefile=mcube, uu=uu, vv=vv,
+                                      mu_RA=pars[-2], mu_DEC=pars[-1],
+                                      return_gcf=True, return_corr_cache=True,
+                                      mod_interp=False)
+        mvis = mvis_.T
+        return mvis, gcf, corr
+    else:
+        mvis = vis_sample(imagefile=mcube, mu_RA=pars[-2], mu_DEC=pars[-1],
+                          gcf_holder=gcf, corr_cache=corr, mod_interp=False).T
+
+        # Doppler correction
+        for itime in range(dataset.nstamps):
+            ixl = np.min(np.where(dataset.tstamp == itime))
+            ixh = np.max(np.where(dataset.tstamp == itime)) + 1
+            fint = interp1d(v_model, mvis[:,ixl:ixh], axis=0, kind=imethod,
+                            fill_value='extrapolate')
+            mvis[:,ixl:ixh] = fint(v_grid[itime,:])
+
+        # populate both polarizations
+        mvis = np.tile(mvis, (2, 1, 1))
+
+        # return the model visibilities
+        return mvis
+
+
+
+
 def vismodel_FITS(pars, fixed, dataset,
                   imethod='cubic', return_holders=False, chpad=3,
                   noise_inject=None):
@@ -525,7 +572,7 @@ def vismodel_FITS(pars, fixed, dataset,
     if noise_inject is not None:
         # Scale input RMS for desired (naturally-weighted) noise per vis-chan
         sigma_out = 1e-3 * noise_inject * np.sqrt(dataset.npol * dataset.nvis)
-        sigma_noise = 1.15 * sigma_out * np.sqrt(8./3.)
+        sigma_noise = sigma_out * np.sqrt(8./3.)
 
         # Random Gaussian noise draws
         noise = np.random.normal(0, sigma_noise,

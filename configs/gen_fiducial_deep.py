@@ -38,7 +38,7 @@ antcfg_dir = '/pool/asha0/casa-release-5.7.2-4.el7/data/alma/simmos/'
 kepmask_dir = '/home/sandrews/mypy/keplerian_mask/'
 
 # datafile naming base
-basename = 'fiducial_std'
+basename = 'fiducial_deep'
 
 # synthetic "raw" naming base
 in_MS = synthraw_dir+basename+'/'+basename
@@ -53,18 +53,21 @@ dataname = reduced_dir+basename+'/'+basename
 
 """
 # array observing settings
-template = ['std']				# template names 
-config = ['alma.cycle8.5'] 			# antenna location lists 
-date = ['2023/03/23'] 				# observation dates (UTC)
-HA_0 = ['-0.25h']				# HAs at observing starts
-ttotal = ['30min'] 				# total on-source times
-tinteg = ['30s']				# integration times per stamp
+template = ['deep4', 'deep7a', 'deep7b', 'deep7c']	# template names 
+config = ['alma.cycle8.4', 'alma.cycle8.7', 
+          'alma.cycle8.7', 'alma.cycle8.7'] 	# antenna location lists 
+date = ['2023/03/01', '2023/05/20', 
+        '2023/05/20', '2023/05/20']		# observation dates (UTC)
+HA_0 = ['-0.375h', '-2.0h', '-0.375h', '1.625h']    # HAs at observing starts
+ttotal = ['45min', '45min', '45min', '45min'] 	# total on-source times
+tinteg = ['30s', '30s', '30s', '30s']		# integration times per stamp
 
 # spectral settings
-dnu_native = [122070.3125] 			# native channel spacings (Hz)
+dnu_native = [61035.15625, 61035.15625, 
+	      61035.15625, 61035.15625] 	# native channel spacings (Hz)
 nu_rest = 230.538e9                		# rest frequency (Hz)
-V_tune  = [4.0e3] 				# LSRK tunings at centers (m/s)
-V_span  = [15.0e3]				# +/- ranges around V_tune (m/s)
+V_tune  = [4.0e3, 4.0e3, 4.0e3, 4.0e3] 		# LSRK tunings at centers (m/s)
+V_span  = [15.0e3, 15.0e3, 15.0e3, 15.0e3]	# +/- ranges around V_tune (m/s)
 nover = 5       				# over-sampling factor (for SRF)
 
 # spatial settings
@@ -72,7 +75,7 @@ RA = '16:00:00.00'    				# phase center RA
 DEC = '-40:00:00.00'   				# phase center DEC
 
 # noise model settings
-RMS = [5.3]					# desired RMS (mJy/beam/chan)
+RMS = [6.1, 6.1, 6.1, 6.1]			# desired RMS (mJy/beam/chan)
 
 
 
@@ -80,7 +83,7 @@ RMS = [5.3]					# desired RMS (mJy/beam/chan)
     DATA REDUCTION SETTINGS:
 
 """
-tavg = ['']					# time-averaging intervals
+tavg = ['', '', '', '']				# time-averaging intervals
 V_bounds = [5.0e3-12e3, 5.0e3+12e3]
 
 
@@ -109,8 +112,8 @@ dx    = 0.
 dy    = 0.
 
 # fixed inputs
-FOV  = [6.375]					# full FOV (arcsec)
-Npix = [256]			 		# number of pixels per FOV
+FOV  = [6.375, 6.375, 6.375, 6.375]		# full FOV (arcsec)
+Npix = [512, 512, 512, 512]	 		# number of pixels per FOV
 						# note: pixsize = FOV/(Npix-1)
 dist = 150.					# distance (pc)
 cfg_dict = {}					# passable dictionary of kwargs
@@ -127,15 +130,15 @@ pars  = np.array([incl, PA, mstar, r_l, z0, psi, T0, q, Tmaxb,
 
 """
 chanstart = '-5.00km/s'
-chanwidth = '0.16km/s' 
-nchan_out = 125
-imsize = 256
-cell = '0.025arcsec'
+chanwidth = '0.08km/s' 
+nchan_out = 250
+imsize = 512
+cell = '0.0125arcsec'
 scales = [0, 10, 30, 50]
 gain = 0.1
 niter = 50000
 robust = 0.5
-threshold = '10mJy'
+threshold = '6mJy'
 uvtaper = ''
 
 # Keplerian mask

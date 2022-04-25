@@ -79,6 +79,37 @@ def lnprob_naif(theta):
     return lnL + dat.lnL0 + lnT, lnT
 
 
+def lnprob_naif_wdoppcorr(theta):
+
+    # compute the log-prior and return if problematic
+    lnT = np.sum(logprior(theta)) * data_['nobs']
+    if lnT == -np.inf:
+        return -np.inf, -np.inf
+
+    # loop through observations to compute the log-likelihood
+    lnL = 0
+    for EB in range(data_['nobs']):
+
+        # get the inference dataset
+        dat = data_[str(EB)]
+
+        # calculate model visibilities
+        mvis = vismodel_naif_wdoppcorr(theta, fixed_, dat,
+                                       data_['gcf'+str(EB)], 
+                                       data_['corr'+str(EB)])
+
+        # compute the residuals (stack both pols)
+        resid = np.hstack(np.absolute(dat.vis - mvis))
+        var = np.hstack(dat.wgt)
+
+        # compute the log-likelihood
+        lnL += -0.5 * np.tensordot(resid, np.dot(dat.inv_cov, var * resid))
+
+    # return the log-posterior and log-prior
+    return lnL + dat.lnL0 + lnT, lnT
+
+
+
 
 
 
@@ -111,6 +142,10 @@ def run_emcee(datafile, fixed, vra=None, vcensor=None,
         if mode == 'naif':
             _mvis, gcf, corr = vismodel_naif(p0[0], fixed_, data_[str(EB)],
                                              return_holders=True)
+        elif mode == 'naif_wdoppcorr':
+            _mvis, gcf, corr = vismodel_naif_wdoppcorr(p0[0], fixed_, 
+                                                       data_[str(EB)],
+                                                       return_holders=True)
         else:
             _mvis, gcf, corr = vismodel_def(p0[0], fixed_, data_[str(EB)],
                                             return_holders=True)
@@ -128,6 +163,13 @@ def run_emcee(datafile, fixed, vra=None, vcensor=None,
             print('\n Note: running in naif mode... \n')
             with Pool() as pool:
                 isampler = emcee.EnsembleSampler(nwalk, ndim, lnprob_naif, 
+                                                 pool=pool)
+                isampler.run_mcmc(p0, ninits, progress=True)
+        elif mode == 'naif_wdoppcorr':
+            print('\n Note: running in naif mode with doppler correction... \n')
+            with Pool() as pool:
+                isampler = emcee.EnsembleSampler(nwalk, ndim, 
+                                                 lnprob_naif_wdoppcorr,
                                                  pool=pool)
                 isampler.run_mcmc(p0, ninits, progress=True)
         else:
@@ -158,6 +200,14 @@ def run_emcee(datafile, fixed, vra=None, vcensor=None,
                 t0 = time.time()
                 sampler.run_mcmc(p00, nsteps, progress=True)
             t1 = time.time()
+        elif mode == 'naif_wdoppcorr':
+            with Pool() as pool:
+                sampler = emcee.EnsembleSampler(nwalk, ndim, 
+                                                lnprob_naif_wdoppcorr,
+                                                pool=pool, backend=backend)
+                t0 = time.time()
+                sampler.run_mcmc(p00, nsteps, progress=True)
+            t1 = time.time()
         else:
             with Pool() as pool:
                 sampler = emcee.EnsembleSampler(nwalk, ndim, lnprob, pool=pool,
@@ -173,6 +223,15 @@ def run_emcee(datafile, fixed, vra=None, vcensor=None,
             with Pool() as pool:
                 new_sampler = emcee.EnsembleSampler(nwalk, ndim, lnprob_naif, 
                                                     pool=pool, 
+                                                    backend=new_backend)
+                t0 = time.time()
+                new_sampler.run_mcmc(None, nsteps, progress=True)
+            t1 = time.time()
+        elif mode == 'naif_wdoppcorr':
+            with Pool() as pool:
+                new_sampler = emcee.EnsembleSampler(nwalk, ndim, 
+                                                    lnprob_naif_wdoppcorr,
+                                                    pool=pool,
                                                     backend=new_backend)
                 t0 = time.time()
                 new_sampler.run_mcmc(None, nsteps, progress=True)
@@ -325,7 +384,7 @@ def post_analysis(outfile, burnin=0, autocorr=False, Ntau=200,
 
     # Parameter inferences (1-D marginalized)
     print(' ')
-    prec = [0.01, 0.01, 0.001, 0.1, 0.01, 0.01, 0.1, 0.001, 0.1, 0.1, 0.01, 
+    prec = [0.01, 0.01, 0.001, 0.1, 0.0001, 0.01, 0.1, 0.001, 0.1, 0.1, 0.01, 
             0.01, 0.1, 0.0001, 0.0001]
     for idim in range(ndim):
         fmt = '{:.'+str(np.abs(np.int(np.log10(prec[idim]))))+'f}'

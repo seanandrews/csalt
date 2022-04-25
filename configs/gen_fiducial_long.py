@@ -38,7 +38,7 @@ antcfg_dir = '/pool/asha0/casa-release-5.7.2-4.el7/data/alma/simmos/'
 kepmask_dir = '/home/sandrews/mypy/keplerian_mask/'
 
 # datafile naming base
-basename = 'fiducial_std'
+basename = 'fiducial_long'
 
 # synthetic "raw" naming base
 in_MS = synthraw_dir+basename+'/'+basename
@@ -53,11 +53,11 @@ dataname = reduced_dir+basename+'/'+basename
 
 """
 # array observing settings
-template = ['std']				# template names 
-config = ['alma.cycle8.5'] 			# antenna location lists 
-date = ['2023/03/23'] 				# observation dates (UTC)
-HA_0 = ['-0.25h']				# HAs at observing starts
-ttotal = ['30min'] 				# total on-source times
+template = ['long']				# template names 
+config = ['alma.cycle8.6'] 			# antenna location lists 
+date = ['2023/04/20'] 				# observation dates (UTC)
+HA_0 = ['-0.5h']				# HAs at observing starts
+ttotal = ['60min'] 				# total on-source times
 tinteg = ['30s']				# integration times per stamp
 
 # spectral settings
@@ -72,7 +72,7 @@ RA = '16:00:00.00'    				# phase center RA
 DEC = '-40:00:00.00'   				# phase center DEC
 
 # noise model settings
-RMS = [5.3]					# desired RMS (mJy/beam/chan)
+RMS = [3.7]					# desired RMS (mJy/beam/chan)
 
 
 
@@ -135,7 +135,7 @@ scales = [0, 10, 30, 50]
 gain = 0.1
 niter = 50000
 robust = 0.5
-threshold = '10mJy'
+threshold = '8mJy'
 uvtaper = ''
 
 # Keplerian mask

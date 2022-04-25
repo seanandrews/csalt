@@ -38,7 +38,7 @@ antcfg_dir = '/pool/asha0/casa-release-5.7.2-4.el7/data/alma/simmos/'
 kepmask_dir = '/home/sandrews/mypy/keplerian_mask/'
 
 # datafile naming base
-basename = 'fiducial_std'
+basename = 'fiducial_hires'
 
 # synthetic "raw" naming base
 in_MS = synthraw_dir+basename+'/'+basename
@@ -53,15 +53,15 @@ dataname = reduced_dir+basename+'/'+basename
 
 """
 # array observing settings
-template = ['std']				# template names 
+template = ['hires']				# template names 
 config = ['alma.cycle8.5'] 			# antenna location lists 
 date = ['2023/03/23'] 				# observation dates (UTC)
-HA_0 = ['-0.25h']				# HAs at observing starts
-ttotal = ['30min'] 				# total on-source times
+HA_0 = ['-0.5h']				# HAs at observing starts
+ttotal = ['60min'] 				# total on-source times
 tinteg = ['30s']				# integration times per stamp
 
 # spectral settings
-dnu_native = [122070.3125] 			# native channel spacings (Hz)
+dnu_native = [61035.15625] 			# native channel spacings (Hz)
 nu_rest = 230.538e9                		# rest frequency (Hz)
 V_tune  = [4.0e3] 				# LSRK tunings at centers (m/s)
 V_span  = [15.0e3]				# +/- ranges around V_tune (m/s)
@@ -127,8 +127,8 @@ pars  = np.array([incl, PA, mstar, r_l, z0, psi, T0, q, Tmaxb,
 
 """
 chanstart = '-5.00km/s'
-chanwidth = '0.16km/s' 
-nchan_out = 125
+chanwidth = '0.08km/s' 
+nchan_out = 250
 imsize = 256
 cell = '0.025arcsec'
 scales = [0, 10, 30, 50]

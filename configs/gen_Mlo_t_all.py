@@ -121,7 +121,7 @@ p1    = -1.0
 p2    = np.inf	
 r_l   = 225.
 
-xmol  = 1e-5
+xmol  = 1e-4
 depl  = 1e-8
 Tfrz  = 20.
 zrmax = 3 

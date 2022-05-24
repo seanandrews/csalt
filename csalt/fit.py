@@ -10,7 +10,6 @@ import corner
 from scipy import stats
 from multiprocessing import Pool
 os.environ["OMP_NUM_THREADS"] = "1"
-sys.path.append('configs/')
 
 
 # log-posterior calculator
@@ -115,7 +114,7 @@ def lnprob_naif_wdoppcorr(theta):
 
 def run_emcee(datafile, fixed, vra=None, vcensor=None, 
               nwalk=75, ninits=200, nsteps=1000, chbin=2, 
-              outfile='stdout.h5', append=False, mode='iter'):
+              outfile='stdout.h5', append=False, mode='iter', nthreads=6):
 
     # load the data
     global data_
@@ -161,19 +160,19 @@ def run_emcee(datafile, fixed, vra=None, vcensor=None,
         # run to initialize
         if mode == 'naif':
             print('\n Note: running in naif mode... \n')
-            with Pool() as pool:
+            with Pool(processes=nthreads) as pool:
                 isampler = emcee.EnsembleSampler(nwalk, ndim, lnprob_naif, 
                                                  pool=pool)
                 isampler.run_mcmc(p0, ninits, progress=True)
         elif mode == 'naif_wdoppcorr':
             print('\n Note: running in naif mode with doppler correction... \n')
-            with Pool() as pool:
+            with Pool(processes=nthreads) as pool:
                 isampler = emcee.EnsembleSampler(nwalk, ndim, 
                                                  lnprob_naif_wdoppcorr,
                                                  pool=pool)
                 isampler.run_mcmc(p0, ninits, progress=True)
         else:
-            with Pool() as pool:
+            with Pool(processes=nthreads) as pool:
                 isampler = emcee.EnsembleSampler(nwalk, ndim, lnprob, pool=pool)
                 isampler.run_mcmc(p0, ninits, progress=True)
         
@@ -194,14 +193,14 @@ def run_emcee(datafile, fixed, vra=None, vcensor=None,
         
         # run the MCMC
         if mode == 'naif':
-            with Pool() as pool:
+            with Pool(processes=nthreads) as pool:
                 sampler = emcee.EnsembleSampler(nwalk, ndim, lnprob_naif,
                                                 pool=pool, backend=backend)
                 t0 = time.time()
                 sampler.run_mcmc(p00, nsteps, progress=True)
             t1 = time.time()
         elif mode == 'naif_wdoppcorr':
-            with Pool() as pool:
+            with Pool(processes=nthreads) as pool:
                 sampler = emcee.EnsembleSampler(nwalk, ndim, 
                                                 lnprob_naif_wdoppcorr,
                                                 pool=pool, backend=backend)
@@ -209,7 +208,7 @@ def run_emcee(datafile, fixed, vra=None, vcensor=None,
                 sampler.run_mcmc(p00, nsteps, progress=True)
             t1 = time.time()
         else:
-            with Pool() as pool:
+            with Pool(processes=nthreads) as pool:
                 sampler = emcee.EnsembleSampler(nwalk, ndim, lnprob, pool=pool,
                                                 backend=backend)
                 t0 = time.time()
@@ -220,7 +219,7 @@ def run_emcee(datafile, fixed, vra=None, vcensor=None,
         print("Initial size: {0}".format(new_backend.iteration))
 
         if mode == 'naif':
-            with Pool() as pool:
+            with Pool(processes=nthreads) as pool:
                 new_sampler = emcee.EnsembleSampler(nwalk, ndim, lnprob_naif, 
                                                     pool=pool, 
                                                     backend=new_backend)
@@ -228,7 +227,7 @@ def run_emcee(datafile, fixed, vra=None, vcensor=None,
                 new_sampler.run_mcmc(None, nsteps, progress=True)
             t1 = time.time()
         elif mode == 'naif_wdoppcorr':
-            with Pool() as pool:
+            with Pool(processes=nthreads) as pool:
                 new_sampler = emcee.EnsembleSampler(nwalk, ndim, 
                                                     lnprob_naif_wdoppcorr,
                                                     pool=pool,
@@ -237,7 +236,7 @@ def run_emcee(datafile, fixed, vra=None, vcensor=None,
                 new_sampler.run_mcmc(None, nsteps, progress=True)
             t1 = time.time()
         else:
-            with Pool() as pool:
+            with Pool(processes=nthreads) as pool:
                 new_sampler = emcee.EnsembleSampler(nwalk, ndim, lnprob, 
                                                     pool=pool,
                                                     backend=new_backend)

@@ -2,9 +2,9 @@ import os, sys
 from csalt.data import *
 
 # I/O
-datafile = 'storage/data/fiducial_long/fiducial_long_noisy.DATA'
+datafile = 'storage/data/fiducial_snap/fiducial_snap_noisy.DATA'
 post_dir = 'storage/posteriors/noise/'
-postfile = 'fiducial_long_noisy.h5'
+postfile = 'fiducial_snap_noisy.h5'
 
 # model setups
 mtype = 'CSALT'
@@ -43,5 +43,5 @@ if not os.path.exists(post_dir):
 # Run the inference
 from csalt.fit import *
 run_emcee(datafile, fixed, vra=vra_fit, vcensor=vcensor, nwalk=nwalk, 
-          ninits=ninits, nsteps=2000, outfile=post_dir+postfile, mode=mode,
-          append=True)
+          ninits=ninits, nsteps=nsteps, outfile=post_dir+postfile, mode=mode,
+          append=False)

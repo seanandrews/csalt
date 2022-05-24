@@ -26,10 +26,12 @@ inpc = importlib.import_module('gen_fiducial_std')
 
 
 # calculate cubes
+inpc.pars[4] *= np.sqrt(55./75.)
+inpc.pars[10] = np.log10(0.9 * 2000 * 10./19.3)
 fixedc = inpc.nu_rest, inpc.FOV[0], inpc.Npix[0], inpc.dist, inpc.cfg_dict
 cubec = pardisk_csalt(velax, inpc.pars, fixedc)
 fixedr = inpr.nu_rest, inpr.FOV[0], inpr.Npix[0], inpr.dist, inpr.cfg_dict
-cuber = pardisk_radmc(velax, inpr.pars, fixedr)
+#cuber = pardisk_radmc(velax, inpr.pars, fixedr)
 
 # plot up some structural information for RADMC-3D model
 r_lims, zr_lims = [0, 300], [0, 0.3]
@@ -42,7 +44,7 @@ _ = radmc_slice_plotter(inpr.radmcname, 'numberdens_co', xslice=[10, 100],
 
 
 # create FITS
-radmc_to_fits(inpr.radmcname+'/', 'cube_radmc.fits', fixedr)
+#radmc_to_fits(inpr.radmcname+'/', 'cube_radmc.fits', fixedr)
 cube_to_fits(cubec, 'cube_csalt.fits', RA=240., DEC=-40.)
 
 

@@ -2,9 +2,9 @@ import os, sys
 from csalt.data import *
 
 # I/O
-datafile = 'storage/data/fiducial_std/fiducial_std_pure.DATA'
+datafile = 'storage/data/fiducial_hires/fiducial_hires_pure.DATA'
 post_dir = 'storage/posteriors/fidelity/'
-postfile = 'fiducial_std_pure.h5'
+postfile = 'fiducial_hires_pure.h5'
 
 # model setups
 mtype = 'CSALT'
@@ -16,6 +16,7 @@ vcensor = None
 nwalk = 75
 ninits = 300
 nsteps = 5000
+nthreads = 6
 
 # fixed parameters
 nu_rest = 230.538e9	# rest frequency of line (Hz)
@@ -43,4 +44,5 @@ if not os.path.exists(post_dir):
 # Run the inference
 from csalt.fit import *
 run_emcee(datafile, fixed, vra=vra_fit, vcensor=vcensor, nwalk=nwalk, 
-          ninits=ninits, nsteps=nsteps, outfile=post_dir+postfile, mode=mode)
+          ninits=ninits, nsteps=nsteps, outfile=post_dir+postfile, mode=mode,
+          nthreads=nthreads)

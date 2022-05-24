@@ -60,8 +60,8 @@ radmcname = radmc_dir+basename
 """
 # array observing settings
 template = ['std'] 				# template names 
-config = ['alma.cycle8.6'] 			# antenna location lists 
-date = ['2022/07/11'] 				# observation dates (UTC)
+config = ['alma.cycle8.5'] 			# antenna location lists 
+date = ['2023/03/23'] 				# observation dates (UTC)
 HA_0 = ['-0.25h']				# HAs at observing starts
 ttotal = ['30min'] 				# total on-source times
 tinteg = ['30s']				# integration times per stamp
@@ -70,7 +70,7 @@ tinteg = ['30s']				# integration times per stamp
 dnu_native = [122070.3125] 			# native channel spacings (Hz)
 nu_rest = 230.538e9                		# rest frequency (Hz)
 V_tune  = [4.0e3] 				# LSRK tunings at centers (m/s)
-V_span  = [20.0e3]				# +/- ranges around V_tune (m/s)
+V_span  = [15.0e3]				# +/- ranges around V_tune (m/s)
 nover = 1       				# over-sampling factor (for SRF)
 
 # spatial settings
@@ -87,7 +87,7 @@ RMS = [5.3]					# desired RMS (mJy/beam/chan)
 
 """
 tavg = ['']					# time-averaging intervals
-V_bounds = [5.0e3-10e3, 5.0e3+10e3]
+V_bounds = [5.0e3-12e3, 5.0e3+12e3]
 
 
 
@@ -99,14 +99,14 @@ incl  = 40.
 PA    = 130.
 mstar = 1.0
 
-Tmid0 = 150.	
+Tmid0 = 55.	
 Tatm0 = 150. 
 qmid  = -0.5
 qatm  = -0.5
 a_z = 1.75
 w_z = 0.25
 
-Sig0  = 19.3
+Sig0  = 10.	#19.3
 p1    = -1.0
 p2    = np.inf
 r_l   = 250.
@@ -114,7 +114,7 @@ r_l   = 250.
 xmol  = 1e-4
 depl  = 1e-20
 Tfrz  = 20.
-zrmax = 2.5
+zrmax = 2.5 
 rmin  = 0.1
 rmax  = 1.1 * r_l
 
@@ -144,7 +144,7 @@ print('zCO = {:1.4} (r / 1") ** {:1.3}'.format(zCO, (3 + qmid)/2))
 
 
 # instantiate RADMC-3D parameters
-grid_params = { 'spatial': {'nr': 256, 'nt': 128, 'r_min': 0.1, 'r_max': 300,
+grid_params = { 'spatial': {'nr': 300, 'nt': 300, 'r_min': 0.1, 'r_max': 300,
                             'rrefine': False },
                 'cyl': { 'nr': 2048, 'nt': 2048, 'r_min': 0.1, 'r_max': 1000,
                          'z_min': 0.001, 'z_max': 500 } }
@@ -156,7 +156,7 @@ setup_params = { 'incl_dust': 0, 'incl_lines': 1, 'nphot': 10000000,
 
 cfg_dict = {'radmcname': radmcname,
             'grid_params': grid_params, 'setup_params': setup_params,
-            'isoz': True, 'dPdr': False, 'selfgrav': False}
+            'isoz': False, 'dPdr': False, 'selfgrav': False}
 
 
 
@@ -164,9 +164,9 @@ cfg_dict = {'radmcname': radmcname,
     IMAGING PARAMETERS:
 
 """
-chanstart = '-1.88km/s'
-chanwidth = '0.32km/s' 
-nchan_out = 43
+chanstart = '-5.00km/s'
+chanwidth = '0.16km/s' 
+nchan_out = 125
 imsize = 256
 cell = '0.025arcsec'
 scales = [0, 10, 30, 50]
@@ -177,8 +177,8 @@ threshold = '10mJy'
 uvtaper = ''
 
 # Keplerian mask
-zr = 2.5 / 10.
-r_max = 1.5 * r_l / dist
+zr = 1. * zCO
+r_max = 1.2 * r_l / dist
 nbeams = 1.5
 
 

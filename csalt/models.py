@@ -220,6 +220,7 @@ def vismodel_full(pars, fixed, dataset, mtype='CSALT',
     else:
         SRF = np.array([0.0, 0.25, 0.50, 0.25, 0.0])
     mvis_pure = convolve1d(mvis_, SRF/np.sum(SRF), axis=1, mode='nearest')
+#    mvis_pure = 1. * mvis_
 
     # Return decimated visibilities, with noise if necessary
     if noise_inject is None:
@@ -233,6 +234,7 @@ def vismodel_full(pars, fixed, dataset, mtype='CSALT',
         # SRF convolution of noisy data
         mvis_noisy = convolve1d(mvis_ + noise, SRF/np.sum(SRF), 
                                 axis=1, mode='nearest')
+        #mvis_noisy = mvis_ + noise
 
         # Decimate
         mvis_pure = mvis_pure[:,::oversample,:,:]
@@ -305,7 +307,7 @@ def vismodel_def(pars, fixed, dataset, mtype='CSALT',
     if noise_inject is not None:
         # Scale input RMS for desired (naturally-weighted) noise per vis-chan
         sigma_out = 1e-3 * noise_inject * np.sqrt(dataset.npol * dataset.nvis)
-        sigma_noise = sigma_out * np.sqrt(8./3.)
+        sigma_noise = sigma_out * 1.16 #* np.sqrt(8./3.)
 
         # Random Gaussian noise draws
         noise = np.random.normal(0, sigma_noise, 

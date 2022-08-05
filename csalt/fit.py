@@ -8,6 +8,7 @@ from priors import *
 import emcee
 import corner
 from scipy import stats
+import scipy.constants as sc
 from multiprocessing import Pool
 os.environ["OMP_NUM_THREADS"] = "1"
 
@@ -129,9 +130,12 @@ def run_emcee(datafile, fixed, vra=None, vcensor=None,
     ndim = len(pri_pars)
     p0 = np.empty((nwalk, ndim))
     for ix in range(ndim):
-        _ = [str(pri_pars[ix][ip])+', ' for ip in range(len(pri_pars[ix]))]
-        cmd = 'np.random.'+pri_types[ix]+'('+"".join(_)+str(nwalk)+')'
-        p0[:,ix] = eval(cmd)
+        if ix == 9:
+            p0[:,ix] = np.sqrt(2 * sc.k * p0[:,6] / (28 * (sc.m_p + sc.m_e)))
+        else:
+            _ = [str(pri_pars[ix][ip])+', ' for ip in range(len(pri_pars[ix]))]
+            cmd = 'np.random.'+pri_types[ix]+'('+"".join(_)+str(nwalk)+')'
+            p0[:,ix] = eval(cmd)
 
 
     # acquire gcfs and corr caches from preliminary model calculations

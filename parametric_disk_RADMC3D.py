@@ -45,13 +45,14 @@ def parametric_disk(velax, pars, pars_fixed, struct_only=False, quiet=True):
         r, z = np.atleast_1d(r), np.atleast_1d(z)
         Tmid, Tatm = Tmid0 * (r / r0)**qmid, Tatm0 * (r / r0)**qatm	
         H_p = np.sqrt(_k * Tmid / (_mu * _mH)) / omega_Kep(r, np.zeros_like(r))
-        if cfg_dict['selfgrav']:
-            Q = np.sqrt(_k * Tmid / (_mu * _mH)) * \
-                omega_Kep(r, np.zeros_like(r)) / (np.pi * _G * Sigma_gas(r))
-            H = np.sqrt(np.pi / 2) * (np.pi / (4 * Q)) * \
-                (np.sqrt(1 + 8 * Q**2 / np.pi) - 1) * H_p
-        else:
-            H = H_p
+#        if cfg_dict['selfgrav']:
+#            Q = np.sqrt(_k * Tmid / (_mu * _mH)) * \
+#                omega_Kep(r, np.zeros_like(r)) / (np.pi * _G * Sigma_gas(r))
+#            H = np.sqrt(np.pi / 2) * (np.pi / (4 * Q)) * \
+#                (np.sqrt(1 + 8 * Q**2 / np.pi) - 1) * H_p
+#        else:
+#            H = H_p
+        H = 1. * H_p
         fz = 0.5 * np.tanh(((z / r) - a_z * (H / r)) / (w_z * (H / r))) + 0.5
         Tout = Tmid + fz * (Tatm - Tmid)
         return np.clip(Tout, a_min=Tmin, a_max=Tmax)

@@ -68,7 +68,7 @@ def mk_tclean(in_MS, outname,
               deconvolver='multiscale', scales=[0, 10, 30, 50], gain=0.1, 
               niter=100000, nterms=1, threshold='5mJy', interactive=False, 
               weighting='briggs', robust=0.5, uvtaper='', 
-              restoringbeam='common', maskfile=''):
+              restoringbeam='common', maskfile='', interpolation='linear'):
 
     fstr = \
         "ext = ['.image', '.mask', '.model', '.pb', '.psf', '.residual', " + \
@@ -85,14 +85,16 @@ def mk_tclean(in_MS, outname,
         "niter="+str(niter)+", interactive="+str(interactive)+", " + \
         "weighting='"+weighting+"', robust="+str(robust)+", \n" + \
         "       uvtaper='"+uvtaper+"', threshold='"+threshold+"', " + \
-        "restoringbeam='common', \n       mask='"+maskfile+"')"
+        "restoringbeam='common', \n       mask='"+maskfile+"', " + \
+        "interpolation='"+interpolation+"')"
 
     return fstr 
 
 
 
 
-def img_cube(in_MS, out_img, cfg_file, mask='', masktype='kep'):
+def img_cube(in_MS, out_img, cfg_file, mask='', masktype='kep', 
+             interp='linear'):
 
     # Load the information in the configuration file
     inp = importlib.import_module(cfg_file)
@@ -117,7 +119,7 @@ def img_cube(in_MS, out_img, cfg_file, mask='', masktype='kep'):
                          gain=inp.gain, niter=inp.niter, 
                          threshold=inp.threshold, robust=inp.robust, 
                          uvtaper=inp.uvtaper, restoringbeam='common', 
-                         maskfile=mask)
+                         interpolation=interp, maskfile=mask)
 
         with open('csalt/CASA_scripts/imaging.py', "w") as outfile:
             print(cstr, file=outfile)
@@ -145,7 +147,8 @@ def img_cube(in_MS, out_img, cfg_file, mask='', masktype='kep'):
                          deconvolver='multiscale', scales=inp.scales,
                          gain=inp.gain, niter=0, threshold=inp.threshold, 
                          robust=inp.robust, uvtaper=inp.uvtaper, 
-                         restoringbeam='common', maskfile='')
+                         restoringbeam='common', interpolation=interp, 
+                         maskfile='')
 
         # Script to make a Keplerian mask
         incl = inp.incl if hasattr(inp, 'incl') else 30.
@@ -180,15 +183,16 @@ def img_cube(in_MS, out_img, cfg_file, mask='', masktype='kep'):
                          threshold=inp.threshold, robust=inp.robust, 
                          uvtaper=inp.uvtaper, restoringbeam='common', 
                          maskfile=inp.reduced_dir+inp.basename+\
-                                  '/images/kep.mask')
+                                  '/images/kep.mask',
+                         interpolation=interp)
 
         # Script to output the cube and mask in FITS format
         ostr = \
             "exportfits('"+out_img+".image', '"+out_img+".image.fits', " + \
             "overwrite=True)\n" + \
             "exportfits('"+out_img+".mask', '"+out_img+".mask.fits', " + \
-            "overwrite=True)\n\n" + \
-            "os.system('rm -rf *.last')"
+            "overwrite=True)\n\n"# + \
+            #"os.system('rm -rf *.last')"
 
         #print('\n' + pstr + cstr + '\n\n' + mstr + '\n\n' + istr + '\n\n' + ostr + '\n')
 

@@ -28,9 +28,6 @@ synthraw_dir = outputbase_dir+'synth_storage/'
 # path to concatenated, "reduced" dataset files
 reduced_dir = outputbase_dir+'data/'
 
-# path to radmc model files
-radmc_dir = outputbase_dir+'radmc/'
-
 # path to hard-copies of CASA logs
 casalogs_dir = outputbase_dir+'CASA_logs/'
 
@@ -41,16 +38,13 @@ antcfg_dir = '/pool/asha0/casa-release-5.7.2-4.el7/data/alma/simmos/'
 kepmask_dir = '/home/sandrews/mypy/keplerian_mask/'
 
 # datafile naming base
-basename = 'radmc_std'
+basename = 'csalt0_exoalma'
 
 # synthetic "raw" naming base
 in_MS = synthraw_dir+basename+'/'+basename
 
 # synthetic "reduced" naming base
 dataname = reduced_dir+basename+'/'+basename
-
-# radmc output naming base
-radmcname = radmc_dir+basename
 
 
 
@@ -59,26 +53,26 @@ radmcname = radmc_dir+basename
 
 """
 # array observing settings
-template = ['std'] 				# template names 
-config = ['alma.cycle8.5'] 			# antenna location lists 
-date = ['2023/03/23'] 				# observation dates (UTC)
-HA_0 = ['-0.25h']				# HAs at observing starts
-ttotal = ['30min'] 				# total on-source times
+template = ['exo12m-lo'] 			# template names 
+config = ['alma.cycle8.3'] 			# antenna location lists 
+date = ['2022/04/20'] 				# observation dates (UTC)
+HA_0 = ['-1.0h'] 				# HAs at observing starts
+ttotal = ['30min'] 	 			# total on-source times
 tinteg = ['30s']				# integration times per stamp
 
 # spectral settings
-dnu_native = [122070.3125] 			# native channel spacings (Hz)
-nu_rest = 230.538e9                		# rest frequency (Hz)
-V_tune  = [4.0e3] 				# LSRK tunings at centers (m/s)
-V_span  = [15.0e3]				# +/- ranges around V_tune (m/s)
+dnu_native = [122e3] 				# native channel spacings (Hz)
+nu_rest = 345.7959899e9                		# rest frequency (Hz)
+V_tune  = [5.0e3]				# LSRK tunings at centers (m/s)
+V_span  = [10e3] 				# +/- ranges around V_tune (m/s)
 nover = 1       				# over-sampling factor (for SRF)
 
 # spatial settings
 RA = '16:00:00.00'    				# phase center RA
-DEC = '-40:00:00.00'   				# phase center DEC
+DEC = '-30:00:00.00'   				# phase center DEC
 
 # noise model settings
-RMS = [5.3]					# desired RMS (mJy/beam/chan)
+RMS = [19.5]					# desired RMS (mJy/beam/chan)
 
 
 
@@ -87,7 +81,7 @@ RMS = [5.3]					# desired RMS (mJy/beam/chan)
 
 """
 tavg = ['']					# time-averaging intervals
-V_bounds = [5.0e3-12e3, 5.0e3+12e3]
+V_bounds = [5.0e3-5e3, 5.0e3+5e3]
 
 
 
@@ -98,65 +92,33 @@ V_bounds = [5.0e3-12e3, 5.0e3+12e3]
 incl  = 40.
 PA    = 130.
 mstar = 1.0
-
-Tmid0 = 65.	
-Tatm0 = 150. 
-qmid  = -0.5
-qatm  = -0.5
-a_z = 1.75
-w_z = 0.25
-
-Sig0  = 10.	#19.3
-p1    = -1.0
-p2    = np.inf
 r_l   = 250.
 
-xmol  = 1e-4
-depl  = 1e-20
-Tfrz  = 20.
-zrmax = 2.5 
-rmin  = 0.1
-rmax  = 1.1 * r_l
+T0    = 150.
+q     = -0.5
+Tmaxb = 20
 
-xi    = 0.0
+z0    = 0.2669
+psi   = (3 + q) / 2.
 
+sigV0 = np.sqrt(2 * sc.k * T0 / (28 * (sc.m_p + sc.m_e)))	
+logtau0 = np.log10(2000.)
+ppp   = -1.
 Vsys  = 5.0e3
 dx    = 0.
 dy    = 0.
-pars  = np.array([incl, PA, mstar, r_l, Tmid0, Tatm0, qmid, qatm, a_z, w_z,
-                  Sig0, p1, p2, xmol, depl, Tfrz, zrmax, rmin, rmax, xi,
-                  Vsys, dx, dy])
 
 # fixed inputs
 FOV  = [6.375]					# full FOV (arcsec)
-Npix = [256]			 		# number of pixels per FOV
+Npix = [512] 					# number of pixels per FOV
 						# note: pixsize = FOV/(Npix-1)
 dist = 150.					# distance (pc)
+cfg_dict = {}					# passable dictionary of kwargs
 
 
+pars  = np.array([incl, PA, mstar, r_l, z0, psi, T0, q, Tmaxb,
+                  sigV0, logtau0, ppp, Vsys, dx, dy])
 
-# Printout the top of the CO emission layer at 1 arcsec
-cs_ = np.sqrt(sc.k * Tmid0 * (1.0*dist / 10)**qmid / (2.37 * (sc.m_p + sc.m_e)))
-om_ = np.sqrt(sc.G * mstar * 1.989e30 / (1.0*dist * sc.au)**3)
-zCO = zrmax * (cs_ / om_) / (1.0*dist * sc.au)
-print('zCO = {:1.4} (r / 1") ** {:1.3}'.format(zCO, (3 + qmid)/2))
-
-
-
-# instantiate RADMC-3D parameters
-grid_params = { 'spatial': {'nr': 300, 'nt': 300, 'r_min': 0.1, 'r_max': 300,
-                            'rrefine': False },
-                'cyl': { 'nr': 2048, 'nt': 2048, 'r_min': 0.1, 'r_max': 1000,
-                         'z_min': 0.001, 'z_max': 500 } }
-
-setup_params = { 'incl_dust': 0, 'incl_lines': 1, 'nphot': 10000000,
-                 'scattering': 'Isotropic', 'camera_tracemode': 'image',
-                 'molecule': 'co', 'transition': 2,
-                 'dustspec': 'DIANAstandard' }
-
-cfg_dict = {'radmcname': radmcname,
-            'grid_params': grid_params, 'setup_params': setup_params,
-            'isoz': False, 'dPdr': False, 'selfgrav': False}
 
 
 
@@ -164,20 +126,20 @@ cfg_dict = {'radmcname': radmcname,
     IMAGING PARAMETERS:
 
 """
-chanstart = '-5.00km/s'
-chanwidth = '0.16km/s' 
-nchan_out = 125
-imsize = 256
-cell = '0.025arcsec'
+chanstart = '-1.0km/s'
+chanwidth = '0.03km/s' 
+nchan_out = 400
+imsize = 512
+cell = '0.0125arcsec'
 scales = [0, 10, 30, 50]
 gain = 0.1
 niter = 50000
 robust = 0.5
-threshold = '10mJy'
+threshold = '14mJy'
 uvtaper = ''
 
 # Keplerian mask
-zr = 1. * zCO
+zr = z0 
 r_max = 1.2 * r_l / dist
 nbeams = 1.5
 

@@ -253,7 +253,7 @@ def vismodel_full(pars, fixed, dataset, mtype='CSALT',
 
 def vismodel_def(pars, fixed, dataset, mtype='CSALT',
                  imethod='cubic', return_holders=False, chpad=3, 
-                 noise_inject=None):
+                 redo_RTimage=True, noise_inject=None):
 
     ### - Prepare inputs
     # Parse fixed parameters
@@ -286,7 +286,7 @@ def vismodel_def(pars, fixed, dataset, mtype='CSALT',
     v_grid = sc.c * (1 - nu_LSRK / restfreq)
 
     # generate a model cube
-    mcube = pd.parametric_disk(v_model, pars, fixed)
+    mcube = pd.parametric_disk(v_model, pars, fixed, newcube=redo_RTimage)
 
     # sample the FT of the cube onto the observed spatial frequencies
     mvis_, gcf, corr = vis_sample(imagefile=mcube, uu=uu, vv=vv, 
@@ -411,8 +411,8 @@ def vismodel_iter(pars, fixed, dataset, gcf, corr, imethod='cubic', chpad=3):
 
 
 
-def vismodel_naif(pars, fixed, dataset, gcf=None, corr=None, 
-                  return_holders=False):
+def vismodel_naif(pars, fixed, dataset, gcf=None, corr=None, mtype='CSALT',
+                  return_holders=False, redo_RTimage=True, noise_inject=None):
 
     ### - Prepare inputs
     # Parse fixed parameters
@@ -423,7 +423,10 @@ def vismodel_naif(pars, fixed, dataset, gcf=None, corr=None,
     v_model = sc.c * (1 - dataset.nu_LSRK[0,:] / restfreq)
 
     # generate a model cube
-    mcube = par_disk_CSALT(v_model, pars, fixed)
+#    mcube = par_disk_CSALT(v_model, pars, fixed)
+    # Load appropriate model for cube calculation
+    pd = importlib.import_module('parametric_disk_'+mtype)
+    mcube = pd.parametric_disk(v_model, pars, fixed, newcube=redo_RTimage)
 
     # sample the FT of the cube onto the observed spatial frequencies
     if return_holders:
@@ -448,7 +451,8 @@ def vismodel_naif(pars, fixed, dataset, gcf=None, corr=None,
 
 
 def vismodel_naif_wdoppcorr(pars, fixed, dataset, gcf=None, corr=None,
-                            return_holders=False, imethod='cubic'):
+                            return_holders=False, imethod='cubic',
+                            mtype='CSALT', redo_RTimage=True, noise_inject=None):
 
     ### - Prepare inputs
     # Parse fixed parameters
@@ -456,12 +460,14 @@ def vismodel_naif_wdoppcorr(pars, fixed, dataset, gcf=None, corr=None,
     npars = len(pars)
 
     # LSRK velocities 
-    mid_stamp = np.int(nu_LSRK.shape[0] / 2)
+    mid_stamp = np.int(dataset.nu_LSRK.shape[0] / 2)
     v_model = sc.c * (1 - dataset.nu_LSRK[mid_stamp,:] / restfreq)
     v_grid = sc.c * (1 - dataset.nu_LSRK / restfreq)
 
     # generate a model cube
-    mcube = par_disk_CSALT(v_model, pars, fixed)
+    #mcube = par_disk_CSALT(v_model, pars, fixed)
+    pd = importlib.import_module('parametric_disk_'+mtype)
+    mcube = pd.parametric_disk(v_model, pars, fixed, newcube=redo_RTimage)
 
     # sample the FT of the cube onto the observed spatial frequencies
     if return_holders:
@@ -489,7 +495,7 @@ def vismodel_naif_wdoppcorr(pars, fixed, dataset, gcf=None, corr=None,
         mvis = np.tile(mvis, (2, 1, 1))
 
         # return the model visibilities
-        return mvis
+        return mvis, mvis
 
 
 

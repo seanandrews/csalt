@@ -300,6 +300,7 @@ class radmc_structure:
         self.setup = cfg_dict["setup_params"]
         self.do_vprs = cfg_dict["dPdr"]
         self.do_vsg = cfg_dict["selfgrav"]
+        self.do_dens_selfgrav = cfg_dict["dens_selfgrav"]
         self.do_isoz = cfg_dict["isoz"]
         self.func_temperature = func_temperature
         self.func_sigma = func_sigma
@@ -390,28 +391,30 @@ class radmc_structure:
                     if (z >= zmax):
                         self.rho_gas[j,i] = _min * _mH * _mu
                     else:
-                        # vertical temperature gradient
+                        # vertical temperature profile
                         Tz = self.func_temperature(r, zg)
-                        dT, dz = np.diff(np.log(Tz)), np.diff(zg)
-                        dlnTdz = np.append(dT, dT[-1]) / np.append(dz, dz[-1])
 
-                        # scale height
-                        Hp = np.sqrt(_k * Tz / (_mu * _mH)) / \
-                             self.func_omega(r, zg)
-                        if self.do_vsg:
-                            Q = np.sqrt(_k * Tz / (_mu * _mH)) * \
-                                self.func_omega(r, zg) / \
-                                (np.pi * _G * self.func_sigma(r))
-                            H = np.sqrt(np.pi / 2) * (np.pi / (4 * Q)) * \
-                                (np.sqrt(1 + 8 * Q**2 / np.pi) - 1) * Hp
+                        # vertical sound speed profile
+                        cs = np.sqrt(_k * Tz / (_mu * _mH))
+
+                        # vertical dlog(cs)/dz profile
+                        dc, dz = np.diff(np.log(cs)), np.diff(zg)
+                        dlncdz = np.append(dc, dc[-1]) / np.append(dz, dz[-1])
+
+                        # vertical gravity from star
+                        gz_star = self.func_omega(r, zg)**2 * zg
+
+                        # vertical gravity from disk
+                        if self.do_dens_selfgrav:
+                            gz_disk = 2 * np.pi * _G * self.func_sigma(r)
                         else:
-                            H = Hp
+                            gz_disk = 0.
 
-                        # vertical gravity
-                        gz = zg / H**2
+                        # total vertical gravity
+                        gz = gz_star + gz_disk
 
-                        # vertical density gradient
-                        dlnpdz = -dlnTdz - gz
+                        # vertical log(density) gradient profile
+                        dlnpdz = -gz / cs**2 - 2 * dlncdz
 
                         # numerical integration
                         lnp = integrate.cumtrapz(dlnpdz, zg, initial=0)
@@ -455,24 +458,32 @@ class radmc_structure:
             dP = np.gradient(P, self.rvals, axis=1) * np.sin(self.tt) + \
                  np.gradient(P, self.tvals, axis=0) * np.cos(self.tt) / self.rr
             vprs2 = self.rr * np.sin(self.tt) * dP / self.rho_gas
-            #vprs2 = np.where(np.isfinite(vprs2), vprs2, 0.0)
+            vprs2 = np.nan_to_num(vprs2, nan=np.inf)
         else:
             vprs2 = 0.
 
         # self-gravity
         if self.do_vsg:
+            # integral grid
             rp = np.logspace(np.log10(self.rvals[0]), 
-                             np.log10(3*self.rvals[-1]), 4096)
-            kk = 4 * rp[None,:] * self.rcyl[:,:,None] / \
-                 ((self.rcyl[:,:,None] + rp[None,:])**2 + \
-                  self.zcyl[:,:,None]**2)
-            br = ellipk(np.sqrt(kk)) - 0.25 * (kk / (1. - kk)) * \
-                 ((rp[None,:] / self.rcyl[:,:,None]) - \
-                  (self.rcyl[:,:,None] / rp[None,:]) + \
-                  (self.zcyl[:,:,None]**2/(self.rcyl[:,:,None]*rp[None,:]))) * \
-                 ellipe(np.sqrt(kk))
-            integ = br * np.sqrt(rp[None,:] / self.rcyl[:,:,None]) * \
-                    np.sqrt(kk) * self.func_sigma(rp[None,:])
+                             np.log10(self.rvals[-1]), 4096)
+
+            # k coordinate
+            kk = np.sqrt(4 * rp[None,:] * self.rcyl[:,:,None] / \
+                         ((self.rcyl[:,:,None] + rp[None,:])**2 + \
+                          self.zcyl[:,:,None]**2))
+
+            # xi(k)
+            xik = ellipk(kk) - 0.25 * (kk**2 / (1. - kk**2)) * \
+                  ((rp[None,:] / self.rcyl[:,:,None]) - \
+                   (self.rcyl[:,:,None] / rp[None,:]) + \
+                   (self.zcyl[:,:,None]**2 / \
+                    (self.rcyl[:,:,None] * rp[None,:]))) * ellipe(kk)
+
+            # field integrand
+            integ = xik * np.sqrt(rp[None,:] / self.rcyl[:,:,None]) * \
+                    kk * self.func_sigma(rp[None,:])
+
             vsg2 = _G * np.trapz(integ, rp, axis=-1)
         else:
             vsg2 = 0.
@@ -513,7 +524,8 @@ class radmc_structure:
                        comments='')
 
 
-    def get_cube(self, inc, PA, dist, nu_rest, FOV, Npix, velax=[0], vlsr=0):
+    def get_cube(self, inc, PA, dist, nu_rest, FOV, Npix, velax=[0], vlsr=0,
+                 newcube=True):
 
         # deal with geometry
         if inc < 0:
@@ -533,17 +545,21 @@ class radmc_structure:
                    header=str(len(wlax))+'\n', comments='')
 
         # run the raytracer
-        cwd = os.getcwd()
-        os.chdir(self.modelname)
-        os.system('rm -rf image.out')
-        os.system('radmc3d image '+ \
-                  'incl %.2f ' % inc + \
-                  'posang %.2f ' % posang + \
-                  'npix %d ' % Npix + \
-                  'sizeau %d ' % sizeau + \
-                  'loadlambda ' + \
-                  'setthreads 6')
-        os.chdir(cwd)
+        if np.logical_and(os.path.exists(self.modelname+'/image.out'), 
+                          newcube == False):
+            print('*** \n Using existing RT cube to populate MS file \n ***')
+        else:
+            cwd = os.getcwd()
+            os.chdir(self.modelname)
+            os.system('rm -rf image.out')
+            os.system('radmc3d image '+ \
+                      'incl %.2f ' % inc + \
+                      'posang %.2f ' % posang + \
+                      'npix %d ' % Npix + \
+                      'sizeau %d ' % sizeau + \
+                      'loadlambda ' + \
+                      'setthreads 6')
+            os.chdir(cwd)
 
         # load the output into a proper cube array
         imagefile = open(self.modelname+'/image.out')
@@ -566,3 +582,70 @@ class radmc_structure:
         data *= 1e23 * pixsize_x * pixsize_y / (dist * _pc)**2
 
         return data
+
+
+    def get_tausurf(self, inc, PA, dist, nu_rest, FOV, Npix, 
+                    taus=2./3., velax=[0], vlsr=0):
+
+        # deal with geometry
+        if inc < 0:
+            inc = np.abs(inc) + 180
+            PA -= 180
+
+        # position angle convention
+        posang = 90 - PA
+
+        # spatial settings
+        sizeau = FOV * dist
+
+        # frequency settings
+        wlax = 1e6 * sc.c / (nu_rest * (1. - (velax - vlsr) / sc.c))
+        if os.path.exists(self.modelname+'/camera_wavelength_micron.inp'):
+            os.system('mv '+self.modelname+'/camera_wavelength_micron.inp '+\
+                      self.modelname+'/camera_wavelength_micron0.inp')
+        np.savetxt(self.modelname+'/camera_wavelength_micron.inp', wlax,
+                   header=str(len(wlax))+'\n', comments='')
+
+        # run the raytracer
+        cwd = os.getcwd()
+        os.chdir(self.modelname)
+        if os.path.exists('image.out'):
+            os.system('mv image.out image0.out')
+        os.system('rm -rf tausurf_3d.out')
+        os.system('radmc3d tausurf %.2f ' % taus + \
+                  'incl %.2f ' % inc + \
+                  'posang %.2f ' % posang + \
+                  'npix %d ' % Npix + \
+                  'sizeau %d ' % sizeau + \
+                  'loadlambda ' + \
+                  'setthreads 6')
+        os.system('mv image.out tau_image.out')
+        os.system('mv image0.out image.out')
+        os.system('mv camera_wavelength_micron0.inp ' + \
+                  'camera_wavelength_micron.inp')
+
+        # load the tau surface output into a proper cube array
+        taufile = open('tausurface_3d.out')
+        tformat = taufile.readline()
+        im_nx, im_ny = taufile.readline().split() #npixels along x and y axes
+        im_nx, im_ny = int(im_nx), int(im_ny)
+        nlam = int(taufile.readline())
+
+        taux, tauy, tauz = np.loadtxt('tausurface_3d.out', skiprows=4+nlam).T
+        taux = np.reshape(taux, [nlam, im_ny, im_nx])
+        tauy = np.reshape(tauy, [nlam, im_ny, im_nx])
+        tauz = np.reshape(tauz, [nlam, im_ny, im_nx])
+
+        # re-orient to align with the FITS output standard for a cube
+        taux = np.rollaxis(np.fliplr(np.rollaxis(taux, 0, 3)), -1)
+        tauy = np.rollaxis(np.fliplr(np.rollaxis(tauy, 0, 3)), -1)
+        tauz = np.rollaxis(np.fliplr(np.rollaxis(tauz, 0, 3)), -1)
+
+        # convert to a multi-dimensional array in SI (meters) units
+        tau_locs = 1e-2 * np.stack((taux, tauy, tauz))
+
+        # and save into a numpy binary file for easier access
+        np.savez_compressed('tausurface_3d.npz', tau_locs=tau_locs)
+        os.chdir(cwd)
+
+        return tau_locs

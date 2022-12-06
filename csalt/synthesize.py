@@ -9,7 +9,7 @@ import h5py
 import copy
 import matplotlib.pyplot as plt
 from csalt.data import dataset, HDF_to_dataset, dataset_to_HDF
-from csalt.models import vismodel_full, vismodel_def, vismodel_FITS
+from csalt.models import vismodel_full, vismodel_def, vismodel_naif_wdoppcorr, vismodel_FITS
 sys.path.append('configs/')
 
 
@@ -116,8 +116,9 @@ def make_data(cfg_file, mtype='CSALT', calctype='full', new_template=True):
     # Make the (blank) template observations (if requested or necessary)
     tfiles = [inp.template_dir+i+'.h5' for i in inp.template]
     if np.logical_or(new_template,
-                     not np.all([os.path.exists(f) for f in tfiles])):
+                     np.all([os.path.exists(f) for f in tfiles]) == False):
         make_template(cfg_file)
+
 
     # Make data in loop over Execution Blocks (EBs)
     for EB in range(len(inp.template)):
@@ -140,8 +141,13 @@ def make_data(cfg_file, mtype='CSALT', calctype='full', new_template=True):
                                                mtype=mtype,
                                                noise_inject=inp.RMS[EB])
             else: 
+                if np.logical_and(mtype == 'RADMC3D', EB > 0):
+                    redo_RTimage = False
+                else:
+                    redo_RTimage = True
                 mvis_p, mvis_n = vismodel_def(inp.pars, fixed, tmp_dataset,
                                               mtype=mtype,
+                                              redo_RTimage=redo_RTimage,
                                               noise_inject=inp.RMS[EB])
 
         # Calculate model weights

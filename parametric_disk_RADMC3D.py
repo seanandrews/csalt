@@ -2,11 +2,13 @@
 An example of how to use simple_disk to make a parametric disk model.
 """
 
-import os, sys
+import os, sys, time
 import numpy as np
 import scipy.constants as sc
 from csalt.radmc_disk import radmc_structure
 from vis_sample.classes import SkyImage
+from scipy import integrate
+from scipy.interpolate import interp1d
 
 
 # constants
@@ -18,7 +20,8 @@ _k  = sc.k * 1e7
 _G  = sc.G * 1e3
 
 
-def parametric_disk(velax, pars, pars_fixed, struct_only=False, quiet=True):
+def parametric_disk(velax, pars, pars_fixed, 
+                    newcube=True, struct_only=False, tausurf=False): 
     """
     Build a parametric disk.
 
@@ -32,8 +35,7 @@ def parametric_disk(velax, pars, pars_fixed, struct_only=False, quiet=True):
     restfreq, FOV, npix, dist, cfg_dict = pars_fixed
 
     inc, PA, mstar, r_l, Tmid0, Tatm0, qmid, qatm, a_z, w_z, Sig0, \
-        p1, p2, xmol, depl, Tfrz, ab_zrmax, ab_rmin, ab_rmax, xi, \
-        vlsr, dx, dy = pars
+        p1, p2, xmol, depl, Tfrz, Ncrit, rmax_abund, xi, vlsr, dx, dy = pars
 
     # Fixed and adjusted parameters
     r0 = 10 * _AU
@@ -44,16 +46,7 @@ def parametric_disk(velax, pars, pars_fixed, struct_only=False, quiet=True):
     def T_gas(r, z):
         r, z = np.atleast_1d(r), np.atleast_1d(z)
         Tmid, Tatm = Tmid0 * (r / r0)**qmid, Tatm0 * (r / r0)**qatm	
-        H_p = np.sqrt(_k * Tmid / (_mu * _mH)) / omega_Kep(r, np.zeros_like(r))
-#        if cfg_dict['selfgrav']:
-#            Q = np.sqrt(_k * Tmid / (_mu * _mH)) * \
-#                omega_Kep(r, np.zeros_like(r)) / (np.pi * _G * Sigma_gas(r))
-#            H = np.sqrt(np.pi / 2) * (np.pi / (4 * Q)) * \
-#                (np.sqrt(1 + 8 * Q**2 / np.pi) - 1) * H_p
-#        else:
-#            H = H_p
-        H = 1. * H_p
-        fz = 0.5 * np.tanh(((z / r) - a_z * (H / r)) / (w_z * (H / r))) + 0.5
+        fz = 0.5 * np.tanh(((z / r) - a_z) / w_z) + 0.5
         Tout = Tmid + fz * (Tatm - Tmid)
         return np.clip(Tout, a_min=Tmin, a_max=Tmax)
 
@@ -66,14 +59,64 @@ def parametric_disk(velax, pars, pars_fixed, struct_only=False, quiet=True):
     def omega_Kep(r, z):
         return np.sqrt(_G * (mstar * _msun) / np.hypot(r, z)**3)
 
+
     # Set up the abundance function
     def abund(r, z):
-        H_p = np.sqrt(_k * Tmid0 * (r / r0)**qmid / (_mu * _mH)) / \
-              omega_Kep(r, np.zeros_like(r))
-        z_mask = np.logical_and(z <= ab_zrmax * H_p, T_gas(r, z) >= Tfrz)
-        #z_mask = np.logical_and(z <= ab_zrmax * H_p, z >= 0.7 * ab_zrmax * H_p)
-        r_mask = np.logical_and(r >= (ab_rmin * _AU), r <= (ab_rmax * _AU))
-        return np.where(np.logical_and(z_mask, r_mask), xmol, xmol * depl)
+        # sophisticated boundary mode
+        zcrit = np.zeros_like(r)
+        for i in range(r.shape[0]):
+            for j in range(r.shape[1]):
+                # define an artificial z grid
+                zg = np.linspace(0, 5.*r[i,j], 1024)
+
+                # vertical sound speed profile
+                cs = np.sqrt(_k * T_gas(r[i,j], zg) / (_mu * _mH))
+
+                # vertical log(sound speed) gradient
+                dlnc, dz = np.diff(np.log(cs)), np.diff(zg)
+                dlncdz = np.append(dlnc, dlnc[-1]) / np.append(dz, dz[-1])
+
+                # vertical gravity from star
+                gz_star = omega_Kep(r[i,j], zg)**2 * zg
+ 
+                # vertical gravity from disk
+                if cfg_dict['dens_selfgrav']:
+                    gz_disk = 2 * np.pi * _G * Sigma_gas(r[i,j])
+                else:
+                    gz_disk = 0.
+
+                # total vertical gravity
+                gz = gz_star + gz_disk
+
+                # vertical log(density) gradient profile
+                dlnpdz = -gz / cs**2 - 2 * dlncdz
+
+                # numerical integration
+                lnp = integrate.cumtrapz(dlnpdz, zg, initial=0)
+                rho0 = np.exp(lnp)
+
+                # normalize
+                rho = 0.5 * rho0 * Sigma_gas(r[i,j])
+                rho /= integrate.trapz(rho0, zg)
+
+                # to number densities
+                n_ = rho / (_mu * _mH)
+                ngas = np.clip(n_, a_min=100, a_max=1e50)
+
+                # flip to integrate downwards in z
+                fngas, fz = ngas[::-1], zg[::-1]
+
+                # vertically-integrated column profile
+                Nz = -integrate.cumtrapz(fngas, fz, initial=0)
+
+                # interpolate to find critical height
+                zint = interp1d(Nz, fz, kind='linear', fill_value='extrapolate')
+                zcrit[i,j] = zint(Ncrit)
+
+        z_mask = np.logical_and(z <= zcrit, T_gas(r, z) >= Tfrz)
+        layer_mask = np.logical_and(z_mask, (r <= rmax_abund * _AU))
+        return np.where(layer_mask, xmol, xmol * depl)
+
 
     # Set up the nonthermal line-width function (NEEDS WORK!)
     def nonthermal_linewidth(r, z):
@@ -81,23 +124,30 @@ def parametric_disk(velax, pars, pars_fixed, struct_only=False, quiet=True):
 
 
     # Compute and quote the total gas mass
-    r_test = np.logspace(-1, np.log10(1.1 * r_l), 2048) * _AU
+    r_test = np.logspace(-1, np.log10(1000), 2048) * _AU
     M_gas = np.trapz(2 * np.pi * r_test * Sigma_gas(r_test), r_test) / _msun
-    M_analytic = 2 * np.pi * Sig0 * r0**-p1 * (r_l * _AU)**(2 + p1) / (2 + p1)
     print('Gas mass of disk = %.4f Msun' % M_gas)
-    print('Analytic mass of disk = %.4f Msun' % (M_analytic / _msun))
 
     # Compute disk structure
+    t0 = time.time()
     struct = radmc_structure(cfg_dict, T_gas, Sigma_gas, omega_Kep, abund,
                              nonthermal_linewidth)
+    t1 = time.time()
+    print('structure time = %f' % ((t1 - t0) / 60.))
 
     if struct_only:
+        return 0
+
+    if tausurf:
+        print('\n Computing emission line photosphere locations... \n')
+        tau_locs = struct.get_tausurf(inc, PA, dist, restfreq, FOV, npix, 
+                                      velax=velax, vlsr=vlsr)
         return 0
 
     else:
         # Build the datacube
         cube = struct.get_cube(inc, PA, dist, restfreq, FOV, npix, 
-                               velax=velax, vlsr=vlsr)
+                               velax=velax, vlsr=vlsr, newcube=newcube)
 
 
         # Pack the cube into a vis_sample SkyImage object and return
@@ -105,5 +155,8 @@ def parametric_disk(velax, pars, pars_fixed, struct_only=False, quiet=True):
         mod_ra  = (FOV / (npix - 1)) * (np.arange(npix) - 0.5 * npix) 
         mod_dec = (FOV / (npix - 1)) * (np.arange(npix) - 0.5 * npix)
         freq = restfreq * (1 - velax / sc.c)
+
+        tf = time.time()
+        print('radmc time = %f' % ((tf - t1) / 60.))
 
         return SkyImage(mod_data, mod_ra, mod_dec, freq, None)

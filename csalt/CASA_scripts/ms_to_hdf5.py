@@ -1,5 +1,5 @@
 """
-    Extract the relevant information from a given measurement set and 
+    Extract the relevant information from a given measurement set and
     record it (in HDF5 format) for easier use in csalt infrastructure.
 """
 
@@ -34,7 +34,7 @@ def ms_to_hdf5(MS_in, HDF_out, append=False, groupname=None):
 
     # Acquire MS information (for easier use external to CASA)
     tb.open(MS_in+'.ms')
-    data = np.squeeze(tb.getcol("DATA"))
+    data = np.squeeze(tb.getcol('DATA'))
     u, v = tb.getcol('UVW')[0,:], tb.getcol('UVW')[1,:]
     weights = tb.getcol('WEIGHT')
     times = tb.getcol("TIME")

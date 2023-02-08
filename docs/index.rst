@@ -15,9 +15,9 @@ Contents
 .. toctree::
    :maxdepth: 1
 
-   installation and running within CASA
-   use with mcfost (can expand to other codes)
+   installation
    input parameters
+   use with mcfost (can expand to other codes)
 
 
 Licence

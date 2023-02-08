@@ -9,6 +9,10 @@ Welcome to csalt's documentation!
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
+   
+   installation and running within CASA
+   use with mcfost (can expand to other codes)
+   input parameters
 
 
 

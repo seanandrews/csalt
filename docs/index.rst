@@ -15,9 +15,9 @@ Contents
 .. toctree::
    :maxdepth: 1
 
-   installation
-   input parameters
-   use with mcfost (can expand to other codes)
+   getting-started
+   input-parameters
+   using-mcfost
 
 
 Licence

@@ -50,7 +50,7 @@ class inf_dataset:
         self.wgt = wgt_bin
         self.iwgt = iwgt
         self.npol, self.nchan, self.nvis = self.vis.shape
-        self.chbin = np.int(len(self.nu_TOPO) / self.vis.shape[1])
+        self.chbin = int(len(self.nu_TOPO) / self.vis.shape[1])
 
         # likelihood-related quantities
         self.cov = M_bin
@@ -75,7 +75,7 @@ def fitdata(datafile, vra=None, vcensor=None, nu_rest=230.538e9, chbin=2):
 
     # If chbin is a scalar, distribute it over the nobs elements
     if np.isscalar(chbin):
-        chbin = chbin * np.ones(nobs, dtype=np.int)
+        chbin = chbin * np.ones(nobs, dtype=int)
     else:
         chbin = np.asarray(chbin)
 
@@ -83,7 +83,10 @@ def fitdata(datafile, vra=None, vcensor=None, nu_rest=230.538e9, chbin=2):
     for i in range(nobs):
 
         # load the data into a dataset object
-        idata = HDF_to_dataset(datafile, grp='EB'+str(i)+'/')
+        if nobs == 1:
+            idata = HDF_to_dataset(datafile)
+        else:
+            idata = HDF_to_dataset(datafile, grp='EB'+str(i)+'/')
 
         # if necessary, distribute weights across spectrum
         if not idata.wgt.shape == idata.vis.shape:
@@ -102,7 +105,7 @@ def fitdata(datafile, vra=None, vcensor=None, nu_rest=230.538e9, chbin=2):
         sgn_v = np.sign(np.diff(vra)[0])
 
         # find where to clip to lie within the desired velocity bounds
-        midstamp = np.int(idata.nstamps / 2)
+        midstamp = int(idata.nstamps / 2)
         ixl = np.abs(v_LSRK[midstamp,:] - vra[0]).argmin()
         ixh = np.abs(v_LSRK[midstamp,:] - vra[1]).argmin()
 
@@ -120,18 +123,20 @@ def fitdata(datafile, vra=None, vcensor=None, nu_rest=230.538e9, chbin=2):
                         ixl += 1
 
         # clip the data to cover only the frequencies of interest
-        inu_TOPO = idata.nu_TOPO[ixl:ixh]
-        inu_LSRK = idata.nu_LSRK[:,ixl:ixh]
-        iv_LSRK = v_LSRK[:,ixl:ixh]
+        inu_TOPO = idata.nu_TOPO[ixl:ixh+1]
+        inu_LSRK = idata.nu_LSRK[:,ixl:ixh+1]
+        iv_LSRK = v_LSRK[:,ixl:ixh+1]
         inchan = inu_LSRK.shape[1]
-        ivis = idata.vis[:,ixl:ixh,:]
-        iwgt = idata.wgt[:,ixl:ixh,:]
+        ivis = idata.vis[:,ixl:ixh+1,:]
+        iwgt = idata.wgt[:,ixl:ixh+1,:]
 
         # spectral binning
-        bnchan = np.int(inchan / chbin[i])
+        print("spectral binning time")
+        bnchan = int(inchan / chbin[i])
         wt = iwgt.reshape((idata.npol, -1, chbin[i], idata.nvis))
         bvis = np.average(ivis.reshape((idata.npol, -1, chbin[i], idata.nvis)), 
                           weights=wt, axis=2)
+        global bwgt
         bwgt = np.sum(wt, axis=2)
 
         # channel censoring
@@ -166,16 +171,38 @@ def fitdata(datafile, vra=None, vcensor=None, nu_rest=230.538e9, chbin=2):
             di, odi = (13./64), (3./128)
         else:
             di, odi = 1, 0      # this is wrong, but maybe useful to test
+        global scov
         scov = di * np.eye(bnchan) + \
                odi * (np.eye(bnchan, k=-1) + np.eye(bnchan, k=1))
         scov_inv = np.linalg.inv(scov)
 
         # pre-calculate the log-likelihood normalization
+        print("log likelihood normalisation time")
         dterm = np.empty((idata.npol, idata.nvis))
+        
+        print(np.sum(dterm))
+        
         for ii in range(idata.nvis):
+            print(ii, "/", idata.nvis)
             for jj in range(idata.npol):
                 sgn, lndet = np.linalg.slogdet(scov / bwgt[jj,:,ii])
                 dterm[jj,ii] = sgn * lndet
+        
+#        input_args = [(ii, jj) for ii in range(idata.nvis) for jj in range(idata.npol)]
+#
+#        with Pool(16) as p:
+#            print("Starting multiprocessing")
+#            results = p.starmap(determinant, input_args)
+#
+#        for result in results:
+#            result[0] = jj
+#            result[1] = ii
+#            result[2] = det
+#            dterm[jj, ii] = det
+
+        print(np.sum(dterm))
+        
+        
         lnL0 = -0.5*(np.prod(bvis.shape) * np.log(2*np.pi) + np.sum(dterm))
 
         # package the data and add to the output dictionary
@@ -192,17 +219,17 @@ def fitdata(datafile, vra=None, vcensor=None, nu_rest=230.538e9, chbin=2):
 def HDF_to_dataset(HDF_in, grp=''):
 
     # Open the HDF file
-    _ = h5py.File(HDF_in+'.h5', "r")
+    data = h5py.File(HDF_in+'.h5', "r")
 
     # Load the inputs into numpy arrays (convert visibilities to complex)
-    _um, _vm = np.asarray(_[grp+'um']), np.asarray(_[grp+'vm'])
-    _vis = np.asarray(_[grp+'vis_real']) + 1j * np.asarray(_[grp+'vis_imag'])
-    _wgts, _stmp = np.asarray(_[grp+'weights']), np.asarray(_[grp+'tstamp_ID'])
-    _TOPO, _LSRK = np.asarray(_[grp+'nu_TOPO']), np.asarray(_[grp+'nu_LSRK'])
-    _.close()
+    data_um, data_vm = np.asarray(data[grp+'um']), np.asarray(data[grp+'vm'])
+    data_vis = np.asarray(data[grp+'vis_real']) + 1j * np.asarray(data[grp+'vis_imag'])
+    data_wgts, data_stmp = np.asarray(data[grp+'weights']), np.asarray(data[grp+'tstamp_ID'])
+    data_TOPO, data_LSRK = np.asarray(data[grp+'nu_TOPO']), np.asarray(data[grp+'nu_LSRK'])
+    data.close()
 
     # Return a dataset object
-    return dataset(_um, _vm, _vis, _wgts, _TOPO, _LSRK, _stmp)
+    return dataset(data_um, data_vm, data_vis, data_wgts, data_TOPO, data_LSRK, data_stmp)
 
 
 

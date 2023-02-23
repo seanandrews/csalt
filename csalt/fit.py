@@ -2,8 +2,8 @@ import os, sys, time, importlib
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-from csalt.data import *
-from csalt.models import *
+from data import *
+from models import *
 from priors import *
 import emcee
 import corner
@@ -14,7 +14,7 @@ os.environ["OMP_NUM_THREADS"] = "1"
 
 
 # log-posterior calculator
-def lnprob(theta):	
+def lnprob(theta, likelihood=False):
 
     # compute the log-prior and return if problematic
     lnT = np.sum(logprior(theta)) * data_['nobs']
@@ -43,6 +43,9 @@ def lnprob(theta):
 
         # compute the log-likelihood
         lnL += -0.5 * np.tensordot(resid, np.dot(dat.inv_cov, var * resid))
+
+    if likelihood == True:
+        return lnL
 
     # return the log-posterior and log-prior
     return lnL + dat.lnL0 + lnT, lnT

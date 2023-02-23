@@ -2,6 +2,8 @@ import os, sys, importlib
 import numpy as np
 import h5py
 import scipy.constants as sc
+from multiprocessing import Pool, Manager
+from numba import njit
 
 # General visibility dataset object
 class dataset:
@@ -178,15 +180,18 @@ def fitdata(datafile, vra=None, vcensor=None, nu_rest=230.538e9, chbin=2):
 
         # pre-calculate the log-likelihood normalization
         print("log likelihood normalisation time")
-        dterm = np.empty((idata.npol, idata.nvis))
+
+#        dterm = np.empty((idata.npol, idata.nvis))
+#
+#        print(np.sum(dterm))
+#
+#        for ii in range(idata.nvis):
+#            print(ii, "/", idata.nvis)
+#            for jj in range(idata.npol):
+#                sgn, lndet = np.linalg.slogdet(scov / bwgt[jj,:,ii])
+#                dterm[jj,ii] = sgn * lndet
         
-        print(np.sum(dterm))
-        
-        for ii in range(idata.nvis):
-            print(ii, "/", idata.nvis)
-            for jj in range(idata.npol):
-                sgn, lndet = np.linalg.slogdet(scov / bwgt[jj,:,ii])
-                dterm[jj,ii] = sgn * lndet
+        dterm = determinant_fast(idata.npol, idata.nvis, scov, bwgt)
         
 #        input_args = [(ii, jj) for ii in range(idata.nvis) for jj in range(idata.npol)]
 #
@@ -277,3 +282,28 @@ def format_data(cfg_file):
     os.system('casa --nologger --logfile '+inp.casalogs_dir+ \
               'format_data.'+cfg_file+'.log '+ \
               '-c csalt/CASA_scripts/format_data.py configs/mconfig_'+cfg_file)
+
+#import sys
+#def sizeof_fmt(num, suffix='B'):
+#    ''' by Fred Cirera,  https://stackoverflow.com/a/1094933/1870254, modified'''
+#    for unit in ['','Ki','Mi','Gi','Ti','Pi','Ei','Zi']:
+#        if abs(num) < 1024.0:
+#            return "%3.1f %s%s" % (num, unit, suffix)
+#        num /= 1024.0
+#    return "%.1f %s%s" % (num, 'Yi', suffix)
+    
+    
+
+@staticmethod
+@njit(fastmath=True)
+def determinant_fast(npol, nvis, scov, bwgt):
+
+    dterm = np.empty((npol, nvis))
+
+    for ii in range(nvis):
+        print(ii,'/', nvis)
+        for jj in range(npol):
+            sgn, lndet = np.linalg.slogdet(scov / bwgt[jj,:,ii])
+            dterm[jj,ii] = sgn * lndet
+                
+        return dterm

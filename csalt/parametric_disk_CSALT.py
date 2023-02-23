@@ -1,4 +1,4 @@
-from csalt.csalt_disk import csalt_disk
+from csalt_disk import csalt_disk
 import scipy.constants as sc
 import numpy as np
 from vis_sample.classes import SkyImage

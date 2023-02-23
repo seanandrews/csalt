@@ -3,6 +3,7 @@ import numpy as np
 import h5py
 import scipy.constants as sc
 from multiprocessing import Pool, Manager
+from numba import njit
 
 # General visibility dataset object
 class dataset:
@@ -179,15 +180,17 @@ def fitdata(datafile, vra=None, vcensor=None, nu_rest=230.538e9, chbin=2):
 
         # pre-calculate the log-likelihood normalization
         print("log likelihood normalisation time")
-        dterm = np.empty((idata.npol, idata.nvis))
+#        dterm = np.empty((idata.npol, idata.nvis))
+#
+#        print(np.sum(dterm))
+#
+#        for ii in range(idata.nvis):
+#            print(ii, "/", idata.nvis)
+#            for jj in range(idata.npol):
+#                sgn, lndet = np.linalg.slogdet(scov / bwgt[jj,:,ii])
+#                dterm[jj,ii] = sgn * lndet
         
-        print(np.sum(dterm))
-        
-        for ii in range(idata.nvis):
-            print(ii, "/", idata.nvis)
-            for jj in range(idata.npol):
-                sgn, lndet = np.linalg.slogdet(scov / bwgt[jj,:,ii])
-                dterm[jj,ii] = sgn * lndet
+        dterm = determinant_fast(idata.npol, idata.nvis, scov, bwgt)
         
 #        input_args = [(ii, jj) for ii in range(idata.nvis) for jj in range(idata.npol)]
 #
@@ -287,20 +290,19 @@ def format_data(cfg_file):
 #            return "%3.1f %s%s" % (num, unit, suffix)
 #        num /= 1024.0
 #    return "%.1f %s%s" % (num, 'Yi', suffix)
-
-
-
-
-def determinant(ii, jj):
-
-    print(ii)
-
-    sgn, lndet = np.linalg.slogdet(scov / bwgt[jj,:,ii])
-    
-#    for name, size in sorted(((name, sys.getsizeof(value)) for name, value in locals().items()),
-#                         key= lambda x: -x[1])[:10]:
-#        print("{:>30}: {:>8}".format(name, sizeof_fmt(size)), flush=True)
-#
-    return (jj, ii, sgn*lndet)
     
     
+
+@staticmethod
+@njit(fastmath=True)
+def determinant_fast(npol, nvis, scov, bwgt):
+
+    dterm = np.empty((npol, nvis))
+
+    for ii in range(nvis):
+        print(ii,'/', nvis)
+        for jj in range(npol):
+            sgn, lndet = np.linalg.slogdet(scov / bwgt[jj,:,ii])
+            dterm[jj,ii] = sgn * lndet
+                
+        return dterm

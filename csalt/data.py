@@ -313,8 +313,6 @@ def format_data(cfg_file):
 #
 #    return dterm
 
-
-
 def determinant(args):
     ii, jj = args
     print(ii,'/499363')

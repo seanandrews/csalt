@@ -10,7 +10,7 @@ import corner
 from scipy import stats
 import scipy.constants as sc
 from multiprocessing import Pool
-os.environ["OMP_NUM_THREADS"] = "1"
+#os.environ["OMP_NUM_THREADS"] = "1"
 
 
 # log-posterior calculator

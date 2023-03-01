@@ -18,7 +18,7 @@ from vis_sample.classes import *
 from astropy.io import fits, ascii
 from parametric_disk_CSALT import parametric_disk as par_disk_CSALT
 from parametric_disk_FITS import parametric_disk as par_disk_FITS
-
+from parametric_disk_MCFOST import parametric_disk as par_disk_MCFOST
 
 def cube_to_fits(sky_image, fitsout, RA=0., DEC=0., restfreq=230.538e9):
 
@@ -356,7 +356,7 @@ def vismodel_def(pars, fixed, dataset, mtype='CSALT',
         return p_mvis
 
 
-def vismodel_iter(pars, fixed, dataset, gcf, corr, imethod='cubic', chpad=3):
+def vismodel_iter(pars, fixed, dataset, gcf, corr, imethod='cubic', chpad=3, code='default'):
 
     ### - Prepare inputs
     # Parse fixed parameters
@@ -382,7 +382,10 @@ def vismodel_iter(pars, fixed, dataset, gcf, corr, imethod='cubic', chpad=3):
     v_grid = sc.c * (1 - nu_LSRK / restfreq)
 
     # generate a model cube
-    mcube = par_disk_CSALT(v_model, pars, fixed)
+    if code == 'mcfost':
+        mcube = par_disk_MCFOST(v_model, pars, fixed)
+    else:
+        mcube = par_disk_CSALT(v_model, pars, fixed)
 
     # sample the FT of the cube onto the observed spatial frequencies
     mvis = vis_sample(imagefile=mcube, mu_RA=pars[-2], mu_DEC=pars[-1], 

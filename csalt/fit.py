@@ -14,7 +14,10 @@ os.environ["OMP_NUM_THREADS"] = "1"
 
 
 # log-posterior calculator
-def lnprob(theta, likelihood=False):
+def lnprob(theta, code='default', likelihood=False, passed_info=None):
+
+    if passed_info is not None:
+        data_, fixed_ = passed_info
 
     # compute the log-prior and return if problematic
     lnT = np.sum(logprior(theta)) * data_['nobs']
@@ -30,7 +33,7 @@ def lnprob(theta, likelihood=False):
 
         # calculate model visibilities
         mvis = vismodel_iter(theta, fixed_, dat,
-                             data_['gcf'+str(EB)], data_['corr'+str(EB)])
+                             code, data_['gcf'+str(EB)], data_['corr'+str(EB)])
 
         # spectrally bin the model
         wt = dat.iwgt.reshape((dat.npol, -1, dat.chbin, dat.nvis))
@@ -44,8 +47,6 @@ def lnprob(theta, likelihood=False):
         # compute the log-likelihood
         lnL += -0.5 * np.tensordot(resid, np.dot(dat.inv_cov, var * resid))
 
-    if likelihood == True:
-        return lnL
 
     # return the log-posterior and log-prior
     return lnL + dat.lnL0 + lnT, lnT

@@ -2,6 +2,7 @@ import os, sys, importlib
 import numpy as np
 import h5py
 import scipy.constants as sc
+import multiprocessing
 from multiprocessing import Pool, Manager
 from numba import njit
 
@@ -181,29 +182,35 @@ def fitdata(datafile, vra=None, vcensor=None, nu_rest=230.538e9, chbin=2):
         # pre-calculate the log-likelihood normalization
         print("log likelihood normalisation time")
 
-#        dterm = np.empty((idata.npol, idata.nvis))
-#
-#        print(np.sum(dterm))
-#
+        dterm = np.empty((idata.npol, idata.nvis))
+
+        print(np.sum(dterm))
+
 #        for ii in range(idata.nvis):
 #            print(ii, "/", idata.nvis)
 #            for jj in range(idata.npol):
 #                sgn, lndet = np.linalg.slogdet(scov / bwgt[jj,:,ii])
 #                dterm[jj,ii] = sgn * lndet
         
-        dterm = determinant_fast(idata.npol, idata.nvis, scov, bwgt)
-        
-#        input_args = [(ii, jj) for ii in range(idata.nvis) for jj in range(idata.npol)]
-#
-#        with Pool(16) as p:
-#            print("Starting multiprocessing")
-#            results = p.starmap(determinant, input_args)
-#
-#        for result in results:
-#            result[0] = jj
-#            result[1] = ii
-#            result[2] = det
-#            dterm[jj, ii] = det
+        filename = 'test.npz'
+
+        if os.path.isfile(filename):
+            loaded_array = np.load(filename)
+            dterm = loaded_array['arr_0']
+        else:
+            input_args = [(ii, jj) for ii in range(idata.nvis) for jj in range(idata.npol)]
+
+            with Pool(32) as p:
+                print("Starting multiprocessing")
+                results = p.map(determinant, input_args)
+
+            for result in results:
+                jj = result[0]
+                ii = result[1]
+                det = result[2]
+                dterm[jj, ii] = det
+
+            np.savez(filename, dterm)
 
         print(np.sum(dterm))
         
@@ -291,19 +298,25 @@ def format_data(cfg_file):
 #            return "%3.1f %s%s" % (num, unit, suffix)
 #        num /= 1024.0
 #    return "%.1f %s%s" % (num, 'Yi', suffix)
-    
-    
 
-@staticmethod
-@njit(fastmath=True)
-def determinant_fast(npol, nvis, scov, bwgt):
+#@staticmethod
+#@njit(fastmath=True, parallel=True)
+#def determinant(npol, nvis, scov, bwgt):
+#
+#    dterm = np.empty((npol, nvis))
+#
+#    for ii in range(nvis):
+#        print(ii,'/', nvis)
+#        for jj in range(npol):
+#            sgn, lndet = np.linalg.slogdet(scov / bwgt[jj,:,ii])
+#            dterm[jj,ii] = sgn * lndet
+#
+#    return dterm
 
-    dterm = np.empty((npol, nvis))
 
-    for ii in range(nvis):
-        print(ii,'/', nvis)
-        for jj in range(npol):
-            sgn, lndet = np.linalg.slogdet(scov / bwgt[jj,:,ii])
-            dterm[jj,ii] = sgn * lndet
-                
-        return dterm
+
+def determinant(args):
+    ii, jj = args
+    print(ii,'/499363')
+    sgn, lndet = np.linalg.slogdet(scov/bwgt[jj,:,ii])
+    return (jj, ii, sgn*lndet)

@@ -16,9 +16,9 @@ import scipy.constants as sc
 import matplotlib.pyplot as plt
 from vis_sample.classes import *
 from astropy.io import fits, ascii
-from parametric_disk_CSALT import parametric_disk as par_disk_CSALT
-from parametric_disk_FITS import parametric_disk as par_disk_FITS
-from parametric_disk_MCFOST import parametric_disk as par_disk_MCFOST
+from csalt.parametric_disk_CSALT import parametric_disk as par_disk_CSALT
+from csalt.parametric_disk_FITS import parametric_disk as par_disk_FITS
+from csalt.parametric_disk_MCFOST import parametric_disk as par_disk_MCFOST
 
 def cube_to_fits(sky_image, fitsout, RA=0., DEC=0., restfreq=230.538e9):
 

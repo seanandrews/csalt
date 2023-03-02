@@ -4,7 +4,6 @@ import h5py
 import scipy.constants as sc
 import multiprocessing
 from multiprocessing import Pool, Manager
-from numba import njit
 
 # General visibility dataset object
 class dataset:

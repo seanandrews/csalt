@@ -2,8 +2,8 @@ import os, sys, time, importlib
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-from data import *
-from models import *
+from csalt.data import *
+from csalt.models import *
 from priors import *
 import emcee
 import corner
@@ -117,7 +117,7 @@ def lnprob_naif_wdoppcorr(theta):
 
 
 
-def run_emcee(datafile, fixed, vra=None, vcensor=None, 
+def run_emcee(datafile, fixed, code=None, vra=None, vcensor=None,
               nwalk=75, ninits=200, nsteps=1000, chbin=2, 
               outfile='stdout.h5', append=False, mode='iter', nthreads=6):
 
@@ -134,12 +134,15 @@ def run_emcee(datafile, fixed, vra=None, vcensor=None,
     ndim = len(pri_pars)
     p0 = np.empty((nwalk, ndim))
     for ix in range(ndim):
-        if ix == 9:
-            p0[:,ix] = np.sqrt(2 * sc.k * p0[:,6] / (28 * (sc.m_p + sc.m_e)))
-        else:
-            _ = [str(pri_pars[ix][ip])+', ' for ip in range(len(pri_pars[ix]))]
-            cmd = 'np.random.'+pri_types[ix]+'('+"".join(_)+str(nwalk)+')'
-            p0[:,ix] = eval(cmd)
+#        if ix == 9:
+#            p0[:,ix] = np.sqrt(2 * sc.k * p0[:,6] / (28 * (sc.m_p + sc.m_e)))
+#        else:
+#            _ = [str(pri_pars[ix][ip])+', ' for ip in range(len(pri_pars[ix]))]
+#            cmd = 'np.random.'+pri_types[ix]+'('+"".join(_)+str(nwalk)+')'
+#            p0[:,ix] = eval(cmd)
+        _ = [str(pri_pars[ix][ip])+', ' for ip in range(len(pri_pars[ix]))]
+        cmd = 'np.random.'+pri_types[ix]+'('+"".join(_)+str(nwalk)+')'
+        p0[:,ix] = eval(cmd)
 
 
     # acquire gcfs and corr caches from preliminary model calculations
@@ -155,7 +158,7 @@ def run_emcee(datafile, fixed, vra=None, vcensor=None,
                                                        return_holders=True)
         else:
             _mvis, gcf, corr = vismodel_def(p0[0], fixed_, data_[str(EB)],
-                                            return_holders=True)
+                                            mtype=code, return_holders=True)
 
         # add gcf, corr caches into data dictionary, indexed by EB
         data_['gcf'+str(EB)] = gcf

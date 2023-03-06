@@ -139,8 +139,13 @@ def run_emcee(datafile, fixed, code=None, vra=None, vcensor=None,
             cmd = 'np.random.'+pri_types[ix]+'('+"".join(_)+str(nwalk)+')'
             p0[:,ix] = eval(cmd)
         elif pri_types[ix] == "truncnorm" or pri_types[ix] == "loguniform":
-            _ = [str(pri_pars[ix][ip])+', ' for ip in range(len(pri_pars[ix]))]
-            cmd = 'stats.'+pri_types[ix]+'('+"".join(_)+str(nwalk)+')'
+            if pri_types[ix] == "truncnorm":
+                params = pri_pars[ix]
+                mod_pri_pars = [(params[2]-params[0])/params[1], (params[3]-params[0])/params[1]]
+                _ = [mod_pri_pars[ip])+', ' for ip in range(len(mod_pri_pars))]
+            else:
+                _ = [str(pri_pars[ix][ip])+', ' for ip in range(len(pri_pars[ix]))]
+            cmd = 'stats.'+pri_types[ix]+'.rvs('+"".join(_)+str(nwalk)+')'
             p0[:,ix] = eval(cmd)
         else:
             raise NameError('Prior type unaccounted for')

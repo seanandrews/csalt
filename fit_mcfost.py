@@ -9,7 +9,8 @@ postfile = ''  # need to fill
 # model setups
 mtype = 'MCFOST'
 mode  = 'iter'
-vra_fit = [-1e3, 11e3]    # (LSRK velocities from -1 to +11 km/s)
+#vra_fit = [-1e3, 11e3]    # (LSRK velocities from -1 to +11 km/s)
+vra_fit = None
 vcensor = None
 
 # inference setups - can change these here
@@ -19,7 +20,7 @@ nsteps = 5000
 nthreads = 6
 
 # fixed parameters
-nu_rest = 2345.796e9                               # rest frequency of line (Hz)
+nu_rest = 345.796e9                                # rest frequency of line (Hz)
 FOV = 6.375                                        # field of view (arcsec)
 Npix = 256                                         # pixels per side
 dist = 144.5                                       # distance (pc)

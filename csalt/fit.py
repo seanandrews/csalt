@@ -134,15 +134,23 @@ def run_emcee(datafile, fixed, code=None, vra=None, vcensor=None,
     ndim = len(pri_pars)
     p0 = np.empty((nwalk, ndim))
     for ix in range(ndim):
+        if pri_types[ix] == "normal" or pri_types[ix] == "uniform":
+            _ = [str(pri_pars[ix][ip])+', ' for ip in range(len(pri_pars[ix]))]
+            cmd = 'np.random.'+pri_types[ix]+'('+"".join(_)+str(nwalk)+')'
+            p0[:,ix] = eval(cmd)
+        elif pri_types[ix] == "truncnorm" or pri_types[ix] == "loguniform":
+            _ = [str(pri_pars[ix][ip])+', ' for ip in range(len(pri_pars[ix]))]
+            cmd = 'stats.'+pri_types[ix]+'('+"".join(_)+str(nwalk)+')'
+            p0[:,ix] = eval(cmd)
+        else:
+            raise NameError('Prior type unaccounted for')
 #        if ix == 9:
 #            p0[:,ix] = np.sqrt(2 * sc.k * p0[:,6] / (28 * (sc.m_p + sc.m_e)))
 #        else:
 #            _ = [str(pri_pars[ix][ip])+', ' for ip in range(len(pri_pars[ix]))]
 #            cmd = 'np.random.'+pri_types[ix]+'('+"".join(_)+str(nwalk)+')'
 #            p0[:,ix] = eval(cmd)
-        _ = [str(pri_pars[ix][ip])+', ' for ip in range(len(pri_pars[ix]))]
-        cmd = 'np.random.'+pri_types[ix]+'('+"".join(_)+str(nwalk)+')'
-        p0[:,ix] = eval(cmd)
+        
 
 
     # acquire gcfs and corr caches from preliminary model calculations

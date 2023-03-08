@@ -83,143 +83,170 @@ def fitdata(datafile, vra=None, vcensor=None, nu_rest=230.538e9, chbin=2):
 
     # Loop through each EB
     for i in range(nobs):
-
-        # load the data into a dataset object
-        if nobs == 1:
-            idata = HDF_to_dataset(datafile)
-        else:
-            idata = HDF_to_dataset(datafile, grp='EB'+str(i)+'/')
-
-        # if necessary, distribute weights across spectrum
-        if not idata.wgt.shape == idata.vis.shape:
-            idata.wgt = np.tile(idata.wgt, (idata.nchan, 1, 1))
-            idata.wgt = np.rollaxis(idata.wgt, 1, 0)
-
-        # convert the LSRK frequency grid to a velocity grid
-        v_LSRK = sc.c * (1 - idata.nu_LSRK / nu_rest)
-
-        # fix direction of desired velocity bounds, based on data format
-        if vra is None: vra = [-1e5, 1e5]
-        dvi, dvra = np.diff(v_LSRK, axis=1), np.diff(vra)
-        if np.logical_or(np.logical_and(np.all(dvi<0), np.all(dvra>0)),
-                         np.logical_and(np.all(dvi>0), np.all(dvra<0))): 
-            vra = vra[::-1]
-        sgn_v = np.sign(np.diff(vra)[0])
-
-        # find where to clip to lie within the desired velocity bounds
-        midstamp = int(idata.nstamps / 2)
-        ixl = np.abs(v_LSRK[midstamp,:] - vra[0]).argmin()
-        ixh = np.abs(v_LSRK[midstamp,:] - vra[1]).argmin()
-
-        # reconcile channel set to be evenly divisible by binning factor
-        if ((ixh - ixl + (ixh - ixl) % chbin[i]) < idata.nchan):
-            for j in range((ixh - ixl) % chbin[i]):
-                if not (ixh == idata.nchan-1):
-                    ixh += 1
-                elif not (ixl == 0):
-                    ixl -= 1
-                else:
-                    if j % 2 == 0: 
-                        ixh -= 1
-                    else:
-                        ixl += 1
-
-        # clip the data to cover only the frequencies of interest
-        inu_TOPO = idata.nu_TOPO[ixl:ixh+1]
-        inu_LSRK = idata.nu_LSRK[:,ixl:ixh+1]
-        iv_LSRK = v_LSRK[:,ixl:ixh+1]
-        inchan = inu_LSRK.shape[1]
-        ivis = idata.vis[:,ixl:ixh+1,:]
-        iwgt = idata.wgt[:,ixl:ixh+1,:]
-
-        # spectral binning
-        print("spectral binning time")
-        bnchan = int(inchan / chbin[i])
-        wt = iwgt.reshape((idata.npol, -1, chbin[i], idata.nvis))
-        bvis = np.average(ivis.reshape((idata.npol, -1, chbin[i], idata.nvis)), 
-                          weights=wt, axis=2)
-        global bwgt
-        bwgt = np.sum(wt, axis=2)
-
-        # channel censoring
-        if vcensor is not None:
-            # determine number of censoring zones
-            ncens = len(vcensor)
-
-            # approximate velocities of binned channels
-            v_ = iv_LSRK[midstamp,:]
-            v_bin = np.average(v_.reshape(-1, chbin[i]), axis=1)
-
-            # identify which (binned) channels are censored (==False)
-            cens_chans = np.ones(inchan, dtype='bool')
-            for j in range(ncens):
-                if sgn_v < 0:
-                    vcens = (vcensor[j])[::-1]
-                else: vcens = vcensor[j]
-                ixl = np.abs(iv_LSRK[midstamp,:] - vcens[0]).argmin()
-                ixh = np.abs(iv_LSRK[midstamp,:] - vcens[1]).argmin()
-                cens_chans[ixl:ixh+1] = False
-            cens_chans = np.all(cens_chans.reshape((-1, chbin[i])), axis=1)
-
-            # set weights --> 0 in censored channels
-            bwgt[:,cens_chans == False,:] = 0
-           
-        # pre-calculate the spectral covariance matrix and its inverse
-        if chbin[i] == 2:
-            di, odi = (5./16), (3./32)
-        elif chbin[i] == 3:
-            di, odi = (1./4), (1./24)
-        elif chbin[i] == 4:
-            di, odi = (13./64), (3./128)
-        else:
-            di, odi = 1, 0      # this is wrong, but maybe useful to test
-        global scov
-        scov = di * np.eye(bnchan) + \
-               odi * (np.eye(bnchan, k=-1) + np.eye(bnchan, k=1))
-        scov_inv = np.linalg.inv(scov)
-
-        # pre-calculate the log-likelihood normalization
-        print("log likelihood normalisation time")
-
-        dterm = np.empty((idata.npol, idata.nvis))
-
-        print(np.sum(dterm))
-
-#        for ii in range(idata.nvis):
-#            print(ii, "/", idata.nvis)
-#            for jj in range(idata.npol):
-#                sgn, lndet = np.linalg.slogdet(scov / bwgt[jj,:,ii])
-#                dterm[jj,ii] = sgn * lndet
-        
-        filename = 'test.npz'
-
+    
+        initialised_file = 'dmtau.npz'
+    
         if os.path.isfile(filename):
+           
             loaded_array = np.load(filename)
-            dterm = loaded_array['arr_0']
+            um = loaded_array['arr_0']
+            vm = loaded_array['arr_1']
+            bvis = loaded_array['arr_2']
+            bwgt = loaded_array['arr_3']
+            inu_TOPO = loaded_array['arr_4']
+            inu_LSRK = loaded_array['arr_5']
+            tstamp = idata.tstamp
+            iwgt = loaded_array['arr_7']
+            scov = loaded_array['arr_8']
+            scov_inv = loaded_array['arr_9']
+            lnL0 = loaded_array['arr_10']
+            
+            out_dict[str(i)] = inf_dataset(um, vm, bvis, bwgt,
+                                           inu_TOPO, inu_LSRK, tstamp, iwgt,
+                                           scov, scov_inv, lnL0)
+        
         else:
-            input_args = [(ii, jj) for ii in range(idata.nvis) for jj in range(idata.npol)]
 
-            with Pool(32) as p:
-                print("Starting multiprocessing")
-                results = p.map(determinant, input_args)
+            # load the data into a dataset object
+            if nobs == 1:
+                idata = HDF_to_dataset(datafile)
+            else:
+                idata = HDF_to_dataset(datafile, grp='EB'+str(i)+'/')
 
-            for result in results:
-                jj = result[0]
-                ii = result[1]
-                det = result[2]
-                dterm[jj, ii] = det
+            # if necessary, distribute weights across spectrum
+            if not idata.wgt.shape == idata.vis.shape:
+                idata.wgt = np.tile(idata.wgt, (idata.nchan, 1, 1))
+                idata.wgt = np.rollaxis(idata.wgt, 1, 0)
 
-            np.savez(filename, dterm)
+            # convert the LSRK frequency grid to a velocity grid
+            v_LSRK = sc.c * (1 - idata.nu_LSRK / nu_rest)
 
-        print(np.sum(dterm))
+            # fix direction of desired velocity bounds, based on data format
+            if vra is None: vra = [-1e5, 1e5]
+            dvi, dvra = np.diff(v_LSRK, axis=1), np.diff(vra)
+            if np.logical_or(np.logical_and(np.all(dvi<0), np.all(dvra>0)),
+                             np.logical_and(np.all(dvi>0), np.all(dvra<0))):
+                vra = vra[::-1]
+            sgn_v = np.sign(np.diff(vra)[0])
+
+            # find where to clip to lie within the desired velocity bounds
+            midstamp = int(idata.nstamps / 2)
+            ixl = np.abs(v_LSRK[midstamp,:] - vra[0]).argmin()
+            ixh = np.abs(v_LSRK[midstamp,:] - vra[1]).argmin()
+
+            # reconcile channel set to be evenly divisible by binning factor
+            if ((ixh - ixl + (ixh - ixl) % chbin[i]) < idata.nchan):
+                for j in range((ixh - ixl) % chbin[i]):
+                    if not (ixh == idata.nchan-1):
+                        ixh += 1
+                    elif not (ixl == 0):
+                        ixl -= 1
+                    else:
+                        if j % 2 == 0:
+                            ixh -= 1
+                        else:
+                            ixl += 1
+
+            # clip the data to cover only the frequencies of interest
+            inu_TOPO = idata.nu_TOPO[ixl:ixh+1]
+            inu_LSRK = idata.nu_LSRK[:,ixl:ixh+1]
+            iv_LSRK = v_LSRK[:,ixl:ixh+1]
+            inchan = inu_LSRK.shape[1]
+            ivis = idata.vis[:,ixl:ixh+1,:]
+            iwgt = idata.wgt[:,ixl:ixh+1,:]
+
+            # spectral binning
+            print("spectral binning time")
+            bnchan = int(inchan / chbin[i])
+            wt = iwgt.reshape((idata.npol, -1, chbin[i], idata.nvis))
+            bvis = np.average(ivis.reshape((idata.npol, -1, chbin[i], idata.nvis)),
+                              weights=wt, axis=2)
+            global bwgt
+            bwgt = np.sum(wt, axis=2)
+
+            # channel censoring
+            if vcensor is not None:
+                # determine number of censoring zones
+                ncens = len(vcensor)
+
+                # approximate velocities of binned channels
+                v_ = iv_LSRK[midstamp,:]
+                v_bin = np.average(v_.reshape(-1, chbin[i]), axis=1)
+
+                # identify which (binned) channels are censored (==False)
+                cens_chans = np.ones(inchan, dtype='bool')
+                for j in range(ncens):
+                    if sgn_v < 0:
+                        vcens = (vcensor[j])[::-1]
+                    else: vcens = vcensor[j]
+                    ixl = np.abs(iv_LSRK[midstamp,:] - vcens[0]).argmin()
+                    ixh = np.abs(iv_LSRK[midstamp,:] - vcens[1]).argmin()
+                    cens_chans[ixl:ixh+1] = False
+                cens_chans = np.all(cens_chans.reshape((-1, chbin[i])), axis=1)
+
+                # set weights --> 0 in censored channels
+                bwgt[:,cens_chans == False,:] = 0
+           
+            # pre-calculate the spectral covariance matrix and its inverse
+            if chbin[i] == 2:
+                di, odi = (5./16), (3./32)
+            elif chbin[i] == 3:
+                di, odi = (1./4), (1./24)
+            elif chbin[i] == 4:
+                di, odi = (13./64), (3./128)
+            else:
+                di, odi = 1, 0      # this is wrong, but maybe useful to test
+            global scov
+            scov = di * np.eye(bnchan) + \
+                   odi * (np.eye(bnchan, k=-1) + np.eye(bnchan, k=1))
+            scov_inv = np.linalg.inv(scov)
+
+            # pre-calculate the log-likelihood normalization
+            print("log likelihood normalisation time")
+
+            dterm = np.empty((idata.npol, idata.nvis))
+
+            print(np.sum(dterm))
+
+#            for ii in range(idata.nvis):
+#                print(ii, "/", idata.nvis)
+#                for jj in range(idata.npol):
+#                    sgn, lndet = np.linalg.slogdet(scov / bwgt[jj,:,ii])
+#                    dterm[jj,ii] = sgn * lndet
+        
+            filename = 'test.npz'
+
+            if os.path.isfile(filename):
+                loaded_array = np.load(filename)
+                dterm = loaded_array['arr_0']
+            else:
+                input_args = [(ii, jj) for ii in range(idata.nvis) for jj in range(idata.npol)]
+
+                with Pool(32) as p:
+                    print("Starting multiprocessing")
+                    results = p.map(determinant, input_args)
+
+                for result in results:
+                    jj = result[0]
+                    ii = result[1]
+                    det = result[2]
+                    dterm[jj, ii] = det
+
+                np.savez(filename, dterm)
+
+            print(np.sum(dterm))
         
         
-        lnL0 = -0.5*(np.prod(bvis.shape) * np.log(2*np.pi) + np.sum(dterm))
+            lnL0 = -0.5*(np.prod(bvis.shape) * np.log(2*np.pi) + np.sum(dterm))
+        
+            np.savez(initialised_file, idata.um, idata.vm, bvis, bwgt,
+                    inu_TOPO, inu_LSRK, idata.tstamp, iwgt,
+                    scov, scov_inv, lnL0)
 
-        # package the data and add to the output dictionary
-        out_dict[str(i)] = inf_dataset(idata.um, idata.vm, bvis, bwgt, 
-                                       inu_TOPO, inu_LSRK, idata.tstamp, iwgt,
-                                       scov, scov_inv, lnL0)
+            # package the data and add to the output dictionary
+            out_dict[str(i)] = inf_dataset(idata.um, idata.vm, bvis, bwgt,
+                                           inu_TOPO, inu_LSRK, idata.tstamp, iwgt,
+                                           scov, scov_inv, lnL0)
 
     # return the output dictionary
     return out_dict

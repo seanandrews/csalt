@@ -268,10 +268,10 @@ def vismodel_def(pars, fixed, dataset, mtype='CSALT',
     vv = dataset.vm * np.mean(dataset.nu_TOPO) / sc.c
 
     # Pad the frequency arrays
-    dnu_TOPO = np.diff(dataset.nu_TOPO)[0]
-    nu_TOPO_s = dataset.nu_TOPO[0] + dnu_TOPO * np.arange(-chpad, 0, 1)
-    nu_TOPO_f = dataset.nu_TOPO[-1] + dnu_TOPO * np.arange(1, chpad+1, 1)
-    nu_TOPO = np.concatenate((nu_TOPO_s, dataset.nu_TOPO, nu_TOPO_f))
+#    dnu_TOPO = np.diff(dataset.nu_TOPO)[0]
+#    nu_TOPO_s = dataset.nu_TOPO[0] + dnu_TOPO * np.arange(-chpad, 0, 1)
+#    nu_TOPO_f = dataset.nu_TOPO[-1] + dnu_TOPO * np.arange(1, chpad+1, 1)
+#    nu_TOPO = np.concatenate((nu_TOPO_s, dataset.nu_TOPO, nu_TOPO_f))
 
     dnu_LSRK = np.diff(dataset.nu_LSRK, axis=1)[:,0]
     nu_LSRK_s = (dataset.nu_LSRK[:,0])[:,None] + \

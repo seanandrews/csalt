@@ -1,11 +1,11 @@
-import pymcfost
+import pymcfost as mcfost
 import scipy.constants as sc
 import numpy as np
 from vis_sample.classes import SkyImage
 import matplotlib.pyplot as plt
 
-def parametric_disk(velax, pars, pars_fixed, delete_previous):
 
+def parametric_disk(velax, pars, pars_fixed, delete_previous):
 
     restfreq, FOV, npix, dist, cfg_dict = pars_fixed  # these need to come in somewhere, right now they are manually in the para file
     inc, mass, h, rc, rin, psi, pa, dust_param, vturb = pars
@@ -33,6 +33,6 @@ def write_run_mcfost(inclination, stellar_mass, scale_height, r_c, r_in, flaring
     updating.simu.viscosity = dust_param
     updating.mol.v_turb = vturb
     updating.writeto('dmtau.para')    # Run mcfost
-    mcfost.run('dmtau.para', options="-mol -casa -photodissociation", delete_previous=True)
+    mcfost.run('dmtau.para', options="-mol -casa -photodissociation", delete_previous=True, logfile='mcfost.log')
     model = mcfost.Line('data_CO/')
     return model

@@ -1,10 +1,14 @@
 import os, sys
+import subprocess
 from csalt.data import *
+import pymcfost as mcfost
 
 # I/O
-datafile = ''  # need to fill
+datafile = '../DM_Tau_test'
 post_dir = 'storage/posteriors/mcfost/'
-postfile = ''  # need to fill
+postfile = 'mcfost_dmtau_test.h5'
+
+mcfost.run('dmtau.para', options="-mol -casa -photodissociation", delete_previous=True)
 
 # model setups
 mtype = 'MCFOST'

@@ -252,7 +252,7 @@ def vismodel_full(pars, fixed, dataset, mtype='CSALT',
 
 
 def vismodel_def(pars, fixed, dataset, mtype='CSALT',
-                 imethod='cubic', return_holders=False, chpad=3, 
+                 imethod='cubic', return_holders=False, chpad=6, 
                  redo_RTimage=True, noise_inject=None):
 
     ### - Prepare inputs

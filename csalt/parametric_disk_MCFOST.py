@@ -5,7 +5,7 @@ from vis_sample.classes import SkyImage
 import matplotlib.pyplot as plt
 
 
-def parametric_disk(velax, pars, pars_fixed, delete_previous):
+def parametric_disk(velax, pars, pars_fixed, newcube):
 
     restfreq, FOV, npix, dist, cfg_dict = pars_fixed  # these need to come in somewhere, right now they are manually in the para file
     inc, mass, h, rc, rin, psi, pa, dust_param, vturb = pars

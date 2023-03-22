@@ -4,17 +4,19 @@ from csalt.data import *
 import pymcfost as mcfost
 
 # I/O
-datafile = '../DM_Tau_test'
+datafile = '../dmtau_ebs'
 post_dir = 'storage/posteriors/mcfost/'
 postfile = 'mcfost_dmtau_test.h5'
 
-mcfost.run('dmtau.para', options="-mol -casa -photodissociation", delete_previous=True)
+#mcfost.run('dmtau.para', options="-mol -casa -photodissociation", delete_previous=True)
 
 # model setups
 mtype = 'MCFOST'
 mode  = 'iter'
 #vra_fit = [-1e3, 11e3]    # (LSRK velocities from -1 to +11 km/s)
+#vra_fit = [-10e3, 10e3]
 vra_fit = None
+#vra_fit = [-1e5, 1e5]
 vcensor = None
 
 # inference setups - can change these here

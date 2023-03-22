@@ -118,7 +118,7 @@ def lnprob_naif_wdoppcorr(theta):
 
 
 def run_emcee(datafile, fixed, code=None, vra=None, vcensor=None,
-              nwalk=75, ninits=200, nsteps=1000, chbin=2, 
+              nwalk=75, ninits=200, nsteps=1000, chbin=1, 
               outfile='stdout.h5', append=False, mode='iter', nthreads=6):
 
     # load the data
@@ -141,11 +141,11 @@ def run_emcee(datafile, fixed, code=None, vra=None, vcensor=None,
         elif pri_types[ix] == "truncnorm" or pri_types[ix] == "loguniform":
             if pri_types[ix] == "truncnorm":
                 params = pri_pars[ix]
-                mod_pri_pars = [(params[2]-params[0])/params[1], (params[3]-params[0])/params[1]]
+                mod_pri_pars = [(params[2]-params[0])/params[1], (params[3]-params[0])/params[1], params[0], params[1]]
                 _ = [str(mod_pri_pars[ip])+', ' for ip in range(len(mod_pri_pars))]
             else:
                 _ = [str(pri_pars[ix][ip])+', ' for ip in range(len(pri_pars[ix]))]
-            cmd = 'stats.'+pri_types[ix]+'.rvs('+"".join(_)+str(nwalk)+')'
+            cmd = 'stats.'+pri_types[ix]+'.rvs('+"".join(_)+'size='+str(nwalk)+')'
             p0[:,ix] = eval(cmd)
         else:
             raise NameError('Prior type unaccounted for')

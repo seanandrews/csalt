@@ -14,10 +14,7 @@ from multiprocessing import Pool
 
 
 # log-posterior calculator
-def lnprob(theta, code='default', likelihood=False, passed_info=None):
-
-    if passed_info is not None:
-        data_, fixed_ = passed_info
+def lnprob(theta, code='default'):
 
     # compute the log-prior and return if problematic
     lnT = np.sum(logprior(theta)) * data_['nobs']
@@ -46,7 +43,6 @@ def lnprob(theta, code='default', likelihood=False, passed_info=None):
 
         # compute the log-likelihood
         lnL += -0.5 * np.tensordot(resid, np.dot(dat.inv_cov, var * resid))
-
 
     # return the log-posterior and log-prior
     return lnL + dat.lnL0 + lnT, lnT
@@ -117,7 +113,7 @@ def lnprob_naif_wdoppcorr(theta):
 
 
 
-def run_emcee(datafile, fixed, code=None, vra=None, vcensor=None,
+def run_emcee(datafile, fixed, code='default', vra=None, vcensor=None,
               nwalk=75, ninits=200, nsteps=1000, chbin=1, 
               outfile='stdout.h5', append=False, mode='iter', nthreads=6):
 
@@ -134,27 +130,29 @@ def run_emcee(datafile, fixed, code=None, vra=None, vcensor=None,
     ndim = len(pri_pars)
     p0 = np.empty((nwalk, ndim))
     for ix in range(ndim):
-        if pri_types[ix] == "normal" or pri_types[ix] == "uniform":
-            _ = [str(pri_pars[ix][ip])+', ' for ip in range(len(pri_pars[ix]))]
-            cmd = 'np.random.'+pri_types[ix]+'('+"".join(_)+str(nwalk)+')'
-            p0[:,ix] = eval(cmd)
-        elif pri_types[ix] == "truncnorm" or pri_types[ix] == "loguniform":
-            if pri_types[ix] == "truncnorm":
-                params = pri_pars[ix]
-                mod_pri_pars = [(params[2]-params[0])/params[1], (params[3]-params[0])/params[1], params[0], params[1]]
-                _ = [str(mod_pri_pars[ip])+', ' for ip in range(len(mod_pri_pars))]
+        if code == 'mcfost':
+            if pri_types[ix] == "normal" or pri_types[ix] == "uniform":
+                _ = [str(pri_pars[ix][ip])+', ' for ip in range(len(pri_pars[ix]))]
+                cmd = 'np.random.'+pri_types[ix]+'('+"".join(_)+str(nwalk)+')'
+                p0[:,ix] = eval(cmd)
+            elif pri_types[ix] == "truncnorm" or pri_types[ix] == "loguniform":
+                if pri_types[ix] == "truncnorm":
+                    params = pri_pars[ix]
+                    mod_pri_pars = [(params[2]-params[0])/params[1], (params[3]-params[0])/params[1], params[0], params[1]]
+                    _ = [str(mod_pri_pars[ip])+', ' for ip in range(len(mod_pri_pars))]
+                else:
+                    _ = [str(pri_pars[ix][ip])+', ' for ip in range(len(pri_pars[ix]))]
+                cmd = 'stats.'+pri_types[ix]+'.rvs('+"".join(_)+'size='+str(nwalk)+')'
+                p0[:,ix] = eval(cmd)
+            else:
+                raise NameError('Prior type unaccounted for')
+        else:
+            if ix == 9:
+                p0[:,ix] = np.sqrt(2 * sc.k * p0[:,6] / (28 * (sc.m_p + sc.m_e)))
             else:
                 _ = [str(pri_pars[ix][ip])+', ' for ip in range(len(pri_pars[ix]))]
-            cmd = 'stats.'+pri_types[ix]+'.rvs('+"".join(_)+'size='+str(nwalk)+')'
-            p0[:,ix] = eval(cmd)
-        else:
-            raise NameError('Prior type unaccounted for')
-#        if ix == 9:
-#            p0[:,ix] = np.sqrt(2 * sc.k * p0[:,6] / (28 * (sc.m_p + sc.m_e)))
-#        else:
-#            _ = [str(pri_pars[ix][ip])+', ' for ip in range(len(pri_pars[ix]))]
-#            cmd = 'np.random.'+pri_types[ix]+'('+"".join(_)+str(nwalk)+')'
-#            p0[:,ix] = eval(cmd)
+                cmd = 'np.random.'+pri_types[ix]+'('+"".join(_)+str(nwalk)+')'
+                p0[:,ix] = eval(cmd)
         
 
 

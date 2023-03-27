@@ -1,10 +1,10 @@
 import os, sys, importlib
 import numpy as np
 import h5py
-import pdb
 import scipy.constants as sc
 import multiprocessing
 from multiprocessing import Pool, Manager
+import pdb    # for debugging
 
 # General visibility dataset object
 class dataset:
@@ -67,7 +67,7 @@ class inf_dataset:
 def fitdata(datafile, vra=None, vcensor=None, nu_rest=230.538e9, chbin=1):
 
     global bwgt
-    global scov
+    global scov      # for external determinant calculation - once we have velocity clips we shouldn't need this
 
     # Load the data from the HDF5 file
     f = h5py.File(datafile+'.h5', "r")
@@ -88,10 +88,12 @@ def fitdata(datafile, vra=None, vcensor=None, nu_rest=230.538e9, chbin=1):
     # Loop through each EB
     for i in range(nobs):
     
-        initialised_file = 'dmtau_eb' + str(i) + '.npz'
+        # This is a time saving device for me - saving data in correct format so I don't
+        # have to recalculate the covariance matrix each time
+        initialised_file = 'eb' + str(i) + '.npz'
     
         if os.path.isfile(initialised_file):
-           
+        
             loaded_array = np.load(initialised_file)
             um = loaded_array['arr_0']
             vm = loaded_array['arr_1']
@@ -112,10 +114,7 @@ def fitdata(datafile, vra=None, vcensor=None, nu_rest=230.538e9, chbin=1):
         else:
 
             # load the data into a dataset object
-            if nobs == 1:
-                idata = HDF_to_dataset(datafile)
-            else:
-                idata = HDF_to_dataset(datafile, grp='EB'+str(i)+'/')
+            idata = HDF_to_dataset(datafile, grp='EB'+str(i)+'/')
 
             # if necessary, distribute weights across spectrum
             if not idata.wgt.shape == idata.vis.shape:
@@ -137,7 +136,7 @@ def fitdata(datafile, vra=None, vcensor=None, nu_rest=230.538e9, chbin=1):
             midstamp = int(idata.nstamps / 2)
             ixl = np.abs(v_LSRK[midstamp,:] - vra[0]).argmin()
             ixh = np.abs(v_LSRK[midstamp,:] - vra[1]).argmin()
-            # print(ixl, ixh)
+            # current debugging
             # pdb.set_trace()
             # reconcile channel set to be evenly divisible by binning factor
             if ((ixh - ixl + (ixh - ixl) % chbin[i]) < idata.nchan):
@@ -161,13 +160,10 @@ def fitdata(datafile, vra=None, vcensor=None, nu_rest=230.538e9, chbin=1):
             iwgt = idata.wgt[:,ixl:ixh+1,:]
 
             # spectral binning
-            print("spectral binning time")
             bnchan = int(inchan / chbin[i])
-            # print(chbin[i])
             wt = iwgt.reshape((idata.npol, -1, chbin[i], idata.nvis))
             bvis = np.average(ivis.reshape((idata.npol, -1, chbin[i], idata.nvis)),
                               weights=wt, axis=2)
-
             bwgt = np.sum(wt, axis=2)
 
             # channel censoring
@@ -208,40 +204,34 @@ def fitdata(datafile, vra=None, vcensor=None, nu_rest=230.538e9, chbin=1):
             scov_inv = np.linalg.inv(scov)
 
             # pre-calculate the log-likelihood normalization
-            print("log likelihood normalisation time")
-
             dterm = np.empty((idata.npol, idata.nvis))
 
-            print(np.sum(dterm))
 
+            # I've left this in but when you're using the full data set
+            # it takes too long to calculate the matrix without multiprocessing
+            
 #            for ii in range(idata.nvis):
 #                print(ii, "/", idata.nvis)
 #                for jj in range(idata.npol):
 #                    sgn, lndet = np.linalg.slogdet(scov / bwgt[jj,:,ii])
 #                    dterm[jj,ii] = sgn * lndet
         
-            filename = 'dmtau_matrix_eb' + str(i) + '.npz'
+            filename = 'matrix_eb' + str(i) + '.npz'
 
             if os.path.isfile(filename):
                 loaded_array = np.load(filename)
                 dterm = loaded_array['arr_0']
             else:
                 input_args = [(ii, jj) for ii in range(idata.nvis) for jj in range(idata.npol)]
-
                 with Pool(32) as p:
                     print("Starting multiprocessing")
                     results = p.map(determinant, input_args)
-
                 for result in results:
                     jj = result[0]
                     ii = result[1]
                     det = result[2]
                     dterm[jj, ii] = det
-
                 np.savez(filename, dterm)
-
-            print(np.sum(dterm))
-        
         
             lnL0 = -0.5*(np.prod(bvis.shape) * np.log(2*np.pi) + np.sum(dterm))
         
@@ -263,18 +253,17 @@ def fitdata(datafile, vra=None, vcensor=None, nu_rest=230.538e9, chbin=1):
 def HDF_to_dataset(HDF_in, grp=''):
 
     # Open the HDF file
-    data = h5py.File(HDF_in+'.h5', "r")
+    _ = h5py.File(HDF_in+'.h5', "r")
 
     # Load the inputs into numpy arrays (convert visibilities to complex)
-    data_um, data_vm = np.asarray(data[grp+'um']), np.asarray(data[grp+'vm'])
-    data_vis = np.asarray(data[grp+'vis_real']) + 1j * np.asarray(data[grp+'vis_imag'])
-    data_wgts, data_stmp = np.asarray(data[grp+'weights']), np.asarray(data[grp+'tstamp_ID'])
-    data_TOPO, data_LSRK = np.asarray(data[grp+'nu_TOPO']), np.asarray(data[grp+'nu_LSRK'])
-    data.close()
+    _um, _vm = np.asarray(_[grp+'um']), np.asarray(_[grp+'vm'])
+    _vis = np.asarray(_[grp+'vis_real']) + 1j * np.asarray(_[grp+'vis_imag'])
+    _wgts, _stmp = np.asarray(_[grp+'weights']), np.asarray(_[grp+'tstamp_ID'])
+    _TOPO, _LSRK = np.asarray(_[grp+'nu_TOPO']), np.asarray(_[grp+'nu_LSRK'])
+    _.close()
 
     # Return a dataset object
-    return dataset(data_um, data_vm, data_vis, data_wgts, data_TOPO, data_LSRK, data_stmp)
-
+    return dataset(_um, _vm, _vis, _wgts, _TOPO, _LSRK, _stmp)
 
 
 
@@ -321,29 +310,6 @@ def format_data(cfg_file):
     os.system('casa --nologger --logfile '+inp.casalogs_dir+ \
               'format_data.'+cfg_file+'.log '+ \
               '-c csalt/CASA_scripts/format_data.py configs/mconfig_'+cfg_file)
-
-#import sys
-#def sizeof_fmt(num, suffix='B'):
-#    ''' by Fred Cirera,  https://stackoverflow.com/a/1094933/1870254, modified'''
-#    for unit in ['','Ki','Mi','Gi','Ti','Pi','Ei','Zi']:
-#        if abs(num) < 1024.0:
-#            return "%3.1f %s%s" % (num, unit, suffix)
-#        num /= 1024.0
-#    return "%.1f %s%s" % (num, 'Yi', suffix)
-
-#@staticmethod
-#@njit(fastmath=True, parallel=True)
-#def determinant(npol, nvis, scov, bwgt):
-#
-#    dterm = np.empty((npol, nvis))
-#
-#    for ii in range(nvis):
-#        print(ii,'/', nvis)
-#        for jj in range(npol):
-#            sgn, lndet = np.linalg.slogdet(scov / bwgt[jj,:,ii])
-#            dterm[jj,ii] = sgn * lndet
-#
-#    return dterm
 
 def determinant(args):
     ii, jj = args

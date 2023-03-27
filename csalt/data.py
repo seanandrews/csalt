@@ -313,6 +313,5 @@ def format_data(cfg_file):
 
 def determinant(args):
     ii, jj = args
-    print(ii,'/499363')
     sgn, lndet = np.linalg.slogdet(scov/bwgt[jj,:,ii])
     return (jj, ii, sgn*lndet)

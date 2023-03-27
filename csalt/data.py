@@ -1,6 +1,7 @@
 import os, sys, importlib
 import numpy as np
 import h5py
+import pdb
 import scipy.constants as sc
 import multiprocessing
 from multiprocessing import Pool, Manager
@@ -63,7 +64,10 @@ class inf_dataset:
 
 
 # Data parsing to generate inputs for likelihood function
-def fitdata(datafile, vra=None, vcensor=None, nu_rest=230.538e9, chbin=2):
+def fitdata(datafile, vra=None, vcensor=None, nu_rest=230.538e9, chbin=1):
+
+    global bwgt
+    global scov
 
     # Load the data from the HDF5 file
     f = h5py.File(datafile+'.h5', "r")
@@ -84,18 +88,18 @@ def fitdata(datafile, vra=None, vcensor=None, nu_rest=230.538e9, chbin=2):
     # Loop through each EB
     for i in range(nobs):
     
-        initialised_file = 'dmtau.npz'
+        initialised_file = 'dmtau_eb' + str(i) + '.npz'
     
-        if os.path.isfile(filename):
+        if os.path.isfile(initialised_file):
            
-            loaded_array = np.load(filename)
+            loaded_array = np.load(initialised_file)
             um = loaded_array['arr_0']
             vm = loaded_array['arr_1']
             bvis = loaded_array['arr_2']
             bwgt = loaded_array['arr_3']
             inu_TOPO = loaded_array['arr_4']
             inu_LSRK = loaded_array['arr_5']
-            tstamp = idata.tstamp
+            tstamp = loaded_array['arr_6']
             iwgt = loaded_array['arr_7']
             scov = loaded_array['arr_8']
             scov_inv = loaded_array['arr_9']
@@ -133,7 +137,8 @@ def fitdata(datafile, vra=None, vcensor=None, nu_rest=230.538e9, chbin=2):
             midstamp = int(idata.nstamps / 2)
             ixl = np.abs(v_LSRK[midstamp,:] - vra[0]).argmin()
             ixh = np.abs(v_LSRK[midstamp,:] - vra[1]).argmin()
-
+            # print(ixl, ixh)
+            # pdb.set_trace()
             # reconcile channel set to be evenly divisible by binning factor
             if ((ixh - ixl + (ixh - ixl) % chbin[i]) < idata.nchan):
                 for j in range((ixh - ixl) % chbin[i]):
@@ -146,7 +151,7 @@ def fitdata(datafile, vra=None, vcensor=None, nu_rest=230.538e9, chbin=2):
                             ixh -= 1
                         else:
                             ixl += 1
-
+             
             # clip the data to cover only the frequencies of interest
             inu_TOPO = idata.nu_TOPO[ixl:ixh+1]
             inu_LSRK = idata.nu_LSRK[:,ixl:ixh+1]
@@ -158,10 +163,11 @@ def fitdata(datafile, vra=None, vcensor=None, nu_rest=230.538e9, chbin=2):
             # spectral binning
             print("spectral binning time")
             bnchan = int(inchan / chbin[i])
+            # print(chbin[i])
             wt = iwgt.reshape((idata.npol, -1, chbin[i], idata.nvis))
             bvis = np.average(ivis.reshape((idata.npol, -1, chbin[i], idata.nvis)),
                               weights=wt, axis=2)
-            global bwgt
+
             bwgt = np.sum(wt, axis=2)
 
             # channel censoring
@@ -196,7 +202,7 @@ def fitdata(datafile, vra=None, vcensor=None, nu_rest=230.538e9, chbin=2):
                 di, odi = (13./64), (3./128)
             else:
                 di, odi = 1, 0      # this is wrong, but maybe useful to test
-            global scov
+            
             scov = di * np.eye(bnchan) + \
                    odi * (np.eye(bnchan, k=-1) + np.eye(bnchan, k=1))
             scov_inv = np.linalg.inv(scov)
@@ -214,7 +220,7 @@ def fitdata(datafile, vra=None, vcensor=None, nu_rest=230.538e9, chbin=2):
 #                    sgn, lndet = np.linalg.slogdet(scov / bwgt[jj,:,ii])
 #                    dterm[jj,ii] = sgn * lndet
         
-            filename = 'test.npz'
+            filename = 'dmtau_matrix_eb' + str(i) + '.npz'
 
             if os.path.isfile(filename):
                 loaded_array = np.load(filename)

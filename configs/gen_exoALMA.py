@@ -33,6 +33,8 @@ casalogs_dir = outputbase_dir+'CASA_logs/'
 # path to CASA/simobserve-format antenna configuration files
 antcfg_dir = '/pool/asha0/casa-release-5.7.2-4.el7/data/alma/simmos/'
 
+kepmask_dir = '/home/caitlynh/bd34_scratch/chardiman/keplerian_mask/'
+
 # datafile naming base
 basename = 'exoALMA'
 
@@ -122,7 +124,25 @@ Npix = [512, 512, 512, 512, 512] 		# number of pixels per FOV
 dist = 150.					# distance (pc)
 cfg_dict = {}					# passable dictionary of kwargs
 
+"""
+    IMAGING PARAMETERS:
+"""
+chanstart = '-1.0km/s'
+chanwidth = '0.03km/s' 
+nchan_out = 400
+imsize = 512
+cell = '0.0125arcsec'
+scales = [0, 10, 30, 50]
+gain = 0.1
+niter = 50000
+robust = 0.5
+threshold = '14mJy'
+uvtaper = ''
 
+# Keplerian mask
+zr = z0 
+r_max = 1.2 * r_l / dist
+nbeams = 1.5
 
 
 """

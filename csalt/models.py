@@ -252,7 +252,7 @@ def vismodel_full(pars, fixed, dataset, mtype='CSALT',
 
 
 def vismodel_def(pars, fixed, dataset, mtype='CSALT',
-                 imethod='cubic', return_holders=False, chpad=3, 
+                 imethod='cubic', return_holders=False, chpad=6, 
                  redo_RTimage=True, noise_inject=None):
 
     ### - Prepare inputs
@@ -273,6 +273,7 @@ def vismodel_def(pars, fixed, dataset, mtype='CSALT',
 #    nu_TOPO_f = dataset.nu_TOPO[-1] + dnu_TOPO * np.arange(1, chpad+1, 1)
 #    nu_TOPO = np.concatenate((nu_TOPO_s, dataset.nu_TOPO, nu_TOPO_f))
 
+    print(dataset.nu_LSRK.shape)
     dnu_LSRK = np.diff(dataset.nu_LSRK, axis=1)[:,0]
     nu_LSRK_s = (dataset.nu_LSRK[:,0])[:,None] + \
                 dnu_LSRK[:,None] * np.arange(-chpad, 0, 1)[None,:]
@@ -290,7 +291,6 @@ def vismodel_def(pars, fixed, dataset, mtype='CSALT',
 
     # sample the FT of the cube onto the observed spatial frequencies
     mvis_, gcf, corr = vis_sample(imagefile=mcube, uu=uu, vv=vv, 
-                                  mu_RA=pars[-2], mu_DEC=pars[-1], 
                                   return_gcf=True, return_corr_cache=True, 
                                   mod_interp=False)
     mvis_ = mvis_.T
@@ -299,6 +299,7 @@ def vismodel_def(pars, fixed, dataset, mtype='CSALT',
     for itime in range(dataset.nstamps):
         ixl = np.min(np.where(dataset.tstamp == itime))
         ixh = np.max(np.where(dataset.tstamp == itime)) + 1
+        print(len(v_model), len(mvis_[:,ixl:ixh]))
         fint = interp1d(v_model, mvis_[:,ixl:ixh], axis=0, kind=imethod, 
                         fill_value='extrapolate')
         mvis_[:,ixl:ixh] = fint(v_grid[itime,:])

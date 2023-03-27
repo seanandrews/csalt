@@ -2,9 +2,7 @@
     This is the configuration file for generating a synthetic dataset from 
     scratch in the csalt architecture.  It is imported as a Python modeule in 
     various subroutines, and will be copied into the directory
-
         outputbase_dir/reduced_dir/basename/
-
     for future reference once the data generation is complete.
 """
 
@@ -33,8 +31,6 @@ casalogs_dir = outputbase_dir+'CASA_logs/'
 # path to CASA/simobserve-format antenna configuration files
 antcfg_dir = '/pool/asha0/casa-release-5.7.2-4.el7/data/alma/simmos/'
 
-kepmask_dir = '/home/caitlynh/bd34_scratch/chardiman/keplerian_mask/'
-
 # datafile naming base
 basename = 'exoALMA'
 
@@ -48,7 +44,6 @@ dataname = reduced_dir+basename+'/'+basename
 
 """
     SIMULATED OBSERVATION SETTINGS:
-
 """
 # array observing settings
 template = ['exo12m-lo', 'exo12m-hi1', 
@@ -87,7 +82,6 @@ RMS = [5.8, 5.8, 5.8, 5.8, 5.8]			# desired RMS (mJy/beam/chan)
 
 """
     DATA REDUCTION SETTINGS:
-
 """
 tavg = ['', '', '', '', '']			# time-averaging intervals
 V_bounds = [0e3-15e3, 0e3+15e3]			# excised V_LSRK range (m/s)
@@ -96,7 +90,6 @@ V_bounds = [0e3-15e3, 0e3+15e3]			# excised V_LSRK range (m/s)
 
 """
     INPUT MODEL PARAMETERS:
-
 """
 # parametric_model inputs
 incl  = 40.
@@ -124,25 +117,7 @@ Npix = [512, 512, 512, 512, 512] 		# number of pixels per FOV
 dist = 150.					# distance (pc)
 cfg_dict = {}					# passable dictionary of kwargs
 
-"""
-    IMAGING PARAMETERS:
-"""
-chanstart = '-1.0km/s'
-chanwidth = '0.03km/s' 
-nchan_out = 400
-imsize = 512
-cell = '0.0125arcsec'
-scales = [0, 10, 30, 50]
-gain = 0.1
-niter = 50000
-robust = 0.5
-threshold = '14mJy'
-uvtaper = ''
 
-# Keplerian mask
-zr = z0 
-r_max = 1.2 * r_l / dist
-nbeams = 1.5
 
 
 """

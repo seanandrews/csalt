@@ -12,7 +12,7 @@ from csalt.models import cube_to_fits
 #cfg = ['sg_taper2hi_M15', 'sg_taper2hi_M05']
 
 #cfg = ['sg_taper2hi_kep', 'sg_taper2hi_prs', 'sg_taper2hi_sg']
-cfg = ['sg_taper2hi_M15']
+cfg = ['sg_modelb', 'sg_modela', 'sg_modelc']
 
 do_raw = True
 raw_tau_only = False
@@ -45,11 +45,6 @@ for i in range(len(cfg)):
                  inp.reduced_dir+inp.basename+'/images/'+ \
                  inp.basename+'_pure.DATA', 'gen_'+cfg[i], masktype='kep')
 
-        # measure the noise statistics in the cube
-#        imfile = inp.reduced_dir+inp.basename+'/images/'+ \
-#                 inp.basename+'_noisy.DATA'
-#        cubestats(imfile)
-
     if do_raw:
         # make a "raw" cube calculated on the output pure/noisy cube velocities
         # channel setups
@@ -59,7 +54,10 @@ for i in range(len(cfg)):
 
         # tau surface only?
 #        if raw_tau_only:
-#        taur = pardisk_radmc(velax, inp.pars, fixed, tausurf=True)
+        taur = pardisk_radmc(velax, inp.pars, fixed, tausurf=True)
+
+        sys.exit()
+
 
         # make a "raw" cube calculation on the pure/noisy cube velocities
 #        else:

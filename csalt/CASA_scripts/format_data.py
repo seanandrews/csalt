@@ -26,7 +26,9 @@ import h5py
 """
 # Ingest input arguments
 bounds_ingest = False
-if len(sys.argv) == 3:
+print(len(sys.argv))
+print(sys.argv)
+if len(sys.argv) == 4:
     cfg_file = sys.argv[-1]
     _ext = ''
 elif len(sys.argv) == 6:

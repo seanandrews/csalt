@@ -4,14 +4,17 @@ from csalt.utils import img_cube, cubestats
 sys.path.append('configs/')
 
 
-cfg = 'almadev_offs'
+cfg = 'almadev_blc1_61kHz'
 
 # only need to do this **one time**.
-#make_template(cfg)
+make_template(cfg)
 
 # impose a model onto the synthetic tracks
-#make_data(cfg, mtype='CSALT', new_template=False)
+make_data(cfg, mtype='CSALT', new_template=False)
 
+
+
+sys.exit()
 
 
 

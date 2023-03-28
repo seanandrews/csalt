@@ -612,6 +612,13 @@ class radmc_structure:
         if os.path.exists('image.out'):
             os.system('mv image.out image0.out')
         os.system('rm -rf tausurf_3d.out')
+        print('radmc3d tausurf %.2f ' % taus + \
+              'incl %.2f ' % inc + \
+              'posang %.2f ' % posang + \
+              'npix %d ' % Npix + \
+              'sizeau %d ' % sizeau + \
+              'loadlambda ' + \
+              'setthreads 6')
         os.system('radmc3d tausurf %.2f ' % taus + \
                   'incl %.2f ' % inc + \
                   'posang %.2f ' % posang + \

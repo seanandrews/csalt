@@ -127,6 +127,8 @@ def fitdata(datafile, vra=None, vcensor=None, nu_rest=230.538e9, chbin=2):
         ivis = idata.vis[:,ixl:ixh,:]
         iwgt = idata.wgt[:,ixl:ixh,:]
 
+        print(iv_LSRK.min(), iv_LSRK.max())
+
         # spectral binning
         bnchan = np.int(inchan / chbin[i])
         wt = iwgt.reshape((idata.npol, -1, chbin[i], idata.nvis))

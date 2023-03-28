@@ -34,7 +34,7 @@ def parametric_disk(velax, pars, pars_fixed,
     # Parse the inputs
     restfreq, FOV, npix, dist, cfg_dict = pars_fixed
 
-    inc, PA, mstar, r_l, Tmid0, Tatm0, qmid, qatm, a_z, w_z, Sig0, \
+    inc, PA, mstar, r_l, Tmid0, Tatm0, qmid, qatm, zq, deltaT, Sig0, \
         p1, p2, xmol, depl, Tfrz, Ncrit, rmax_abund, xi, vlsr, dx, dy = pars
 
     # Fixed and adjusted parameters
@@ -46,8 +46,10 @@ def parametric_disk(velax, pars, pars_fixed,
     def T_gas(r, z):
         r, z = np.atleast_1d(r), np.atleast_1d(z)
         Tmid, Tatm = Tmid0 * (r / r0)**qmid, Tatm0 * (r / r0)**qatm	
-        fz = 0.5 * np.tanh(((z / r) - a_z) / w_z) + 0.5
-        Tout = Tmid + fz * (Tatm - Tmid)
+        zqr = zq * r
+        fz = (np.cos(np.pi * z / (2 * zqr)))**deltaT
+        Tgas = Tatm + (Tmid - Tatm) * fz
+        Tout = np.where(z >= zqr, Tatm, Tgas)
         return np.clip(Tout, a_min=Tmin, a_max=Tmax)
 
     # Set up the surface density function
@@ -141,7 +143,7 @@ def parametric_disk(velax, pars, pars_fixed,
     if tausurf:
         print('\n Computing emission line photosphere locations... \n')
         tau_locs = struct.get_tausurf(inc, PA, dist, restfreq, FOV, npix, 
-                                      velax=velax, vlsr=vlsr)
+                                      taus=2./3., velax=velax, vlsr=vlsr)
         return 0
 
     else:

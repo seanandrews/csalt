@@ -2,19 +2,24 @@ import os, sys
 import numpy as np
 import casatasks
 import casatools
+import scipy.constants as sc
 
 # General visibility dataset object
 class dataset:
 
    def __init__(self, um, vm, vis, wgt, nu_TOPO, nu_LSRK, tstamp_ID):
 
+        # spectral frequencies in Hz units (LSRK for each timestamp)
+        self.nu_TOPO = nu_TOPO
+        self.nu_LSRK = nu_LSRK
+
         # spatial frequencies in meters units
         self.um = um
         self.vm = vm
 
-        # spectral frequencies in Hz units (LSRK for each timestamp)
-        self.nu_TOPO = nu_TOPO
-        self.nu_LSRK = nu_LSRK
+        # spatial frequencies in lambda units
+        self.ulam = self.um * np.mean(self.nu_TOPO) / sc.c
+        self.vlam = self.vm * np.mean(self.nu_TOPO) / sc.c        
 
         # data visibilities, weights, and timestamp IDs
         self.vis = vis

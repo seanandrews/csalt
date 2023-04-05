@@ -12,7 +12,7 @@ from csalt.models import cube_to_fits
 #cfg = ['sg_taper2hi_M15', 'sg_taper2hi_M05']
 
 #cfg = ['sg_taper2hi_kep', 'sg_taper2hi_prs', 'sg_taper2hi_sg']
-cfg = ['sg_modelb', 'sg_modela', 'sg_modelc']
+cfg = ['sg_modelc', 'sg_modela', 'sg_modelc']
 
 do_raw = True
 raw_tau_only = False

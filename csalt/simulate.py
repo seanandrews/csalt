@@ -19,11 +19,11 @@ class simulate:
 
     """ Generate a cube """
     def cube(self, velax, pars, 
-             restfreq=230.538e9, FOV=5.0, npix=256, dist=150):
+             restfreq=230.538e9, FOV=5.0, Npix=256, dist=150):
 
         # Parse inputs
         if isinstance(velax, list): velax = np.array(velax)
-        fixed = restfreq, FOV, npix, dist, {}
+        fixed = restfreq, FOV, Npix, dist, {}
 
         # Locate the prescription file
         if self.path is not None:
@@ -45,12 +45,12 @@ class simulate:
 
 
     """ Spectral Response Functions (SRF) """
-    def get_SRF(self, srf_type, nover=1):
+    def get_SRF(self, srf_type, Nup=1):
         
         if srf_type == 'ALMA':
             # if spectra are oversampled, use the full kernel
-            if nover > 1:
-                chix = np.arange(25 * nover) / nover
+            if Nup > 1:
+                chix = np.arange(25 * Nup) / Nup
                 xch = chix - np.mean(chix)
                 srf_ = 0.5 * np.sinc(xch) + \
                        0.25 * np.sinc(xch - 1) + 0.25 * np.sinc(xch + 1)
@@ -65,8 +65,8 @@ class simulate:
 
     """ Generate simulated data ('model') """
     def model(self, datadict, pars,
-              restfreq=230.538e9, FOV=5.0, npix=256, dist=150,
-              chpad=3, nover=None, noise_inject=None,
+              restfreq=230.538e9, FOV=5.0, Npix=256, dist=150,
+              chpad=3, Nup=None, noise_inject=None,
               doppcorr='approx', SRF='ALMA'):
 
         # Copy the input data format to a model
@@ -77,8 +77,8 @@ class simulate:
         for EB in EBlist:
             modeldict[str(EB)] = self.modelset(datadict[str(EB)], pars,
                                                restfreq=restfreq, FOV=FOV,
-                                               npix=npix, dist=dist,
-                                               chpad=chpad, nover=nover,
+                                               Npix=Npix, dist=dist,
+                                               chpad=chpad, Nup=Nup,
                                                noise_inject=noise_inject,
                                                doppcorr=doppcorr, SRF=SRF)
 
@@ -87,33 +87,31 @@ class simulate:
 
     """ Generate simulated dataset ('modelset') """
     def modelset(self, dset, pars,
-                 restfreq=230.538e9, FOV=5.0, npix=256, dist=150, chpad=3, 
-                 nover=None, noise_inject=None, doppcorr='approx', SRF='ALMA'):
+                 restfreq=230.538e9, FOV=5.0, Npix=256, dist=150, chpad=3, 
+                 Nup=None, noise_inject=None, doppcorr='approx', SRF='ALMA'):
 
-        # Pad the frequency grids
-        dnu_LSRK = np.diff(dset.nu_LSRK, axis=1)[:,0]
+        """ Prepare the spectral grids: format = [timestamps, channels] """
+        # Pad the LSRK frequencies
+        dnu_n = (np.diff(dset.nu_LSRK, axis=1)[:,0])[:,None]
         _pad = (dset.nu_LSRK[:,0])[:,None] + \
-                dnu_LSRK[:,None] * np.arange(-chpad, 0, 1)[None,:]
+                dnu_n * np.arange(-chpad, 0, 1)[None,:]
         pad_ = (dset.nu_LSRK[:,-1])[:,None] + \
-                dnu_LSRK[:,None] * np.arange(1, chpad+1, 1)[None,:]
-        nuLSRK = np.concatenate((_pad, dset.nu_LSRK, pad_), axis=1)
+                dnu_n * np.arange(1, chpad+1, 1)[None,:]
+        nu_ = np.concatenate((_pad, dset.nu_LSRK, pad_), axis=1)
 
-        # Define upsampled frequency grids if desired
-        if nover is not None:
-            nchan = dset.nchan + 2 * chpad
-            nch = (nchan - 1) * nover + 1
-            nu_LSRK = np.empty((dset.nstamps, nch))
+        # Upsample the LSRK frequencies (if requested)
+        if Nup is not None:
+            nchan = nu_.shape[1]
+            nu = np.empty((dset.nstamps, (nchan - 1) * Nup + 1))
             for it in range(dset.nstamps):
-                nu_LSRK[it,:] = np.interp(np.arange((nchan - 1) * nover + 1),
-                                          np.arange(0, nchan * nover, nover),
-                                          nuLSRK[it,:])
+                nu[it,:] = np.interp(np.arange((nchan - 1) * Nup + 1),
+                                     np.arange(0, nchan * Nup, Nup), nu_[it,:])
         else:
-            nu_LSRK = 1. * nuLSRK
-            nch = nu_LSRK.shape[1]
-            nover = 1
+            nu, Nup = 1. * nu_, 1
+        nch = nu.shape[1]
 
         # Calculate LSRK velocities
-        v_LSRK = sc.c * (1 - nu_LSRK / restfreq)
+        vel = sc.c * (1 - nu / restfreq)
 
 
         ### - Compute the model visibilities
@@ -126,8 +124,8 @@ class simulate:
                 print('timestamp '+str(itime+1)+' / '+str(dset.nstamps))
 
                 # make a cube
-                icube = self.cube(v_LSRK[itime,:], pars, restfreq=restfreq,
-                                  FOV=FOV, npix=npix, dist=dist)
+                icube = self.cube(vel[itime,:], pars, restfreq=restfreq,
+                                  FOV=FOV, Npix=Npix, dist=dist)
 
                 # visibility indices for this timestamp only
                 ixl = np.min(np.where(dset.tstamp == itime))
@@ -147,12 +145,11 @@ class simulate:
 
         else:
             # velocities at the mid-point timestamp of this EB
-            mid_stamp = int(np.round(nu_LSRK.shape[0] / 2))
-            v_model = v_LSRK[mid_stamp,:]
+            v_model = vel[int(np.round(nu.shape[0] / 2)),:]
 
             # make a cube
             icube = self.cube(v_model, pars, restfreq=restfreq,
-                              FOV=FOV, npix=npix, dist=dist)
+                              FOV=FOV, Npix=Npix, dist=dist)
 
             # sample the FFT on the (u, v) spacings
             mvis = vis_sample(imagefile=icube, uu=dset.ulam, vv=dset.vlam, 
@@ -165,7 +162,7 @@ class simulate:
                 ixh = np.max(np.where(dset.tstamp == itime)) + 1
                 fint = interp1d(v_model, mvis[:,ixl:ixh], axis=0, kind='cubic',
                                 fill_value='extrapolate')
-                interp_vis = fint(v_LSRK[itime,:])
+                interp_vis = fint(vel[itime,:])
                 mvis_[0,:,ixl:ixh,0] = interp_vis.real
                 mvis_[1,:,ixl:ixh,0] = interp_vis.real
                 mvis_[0,:,ixl:ixh,1] = interp_vis.imag
@@ -173,7 +170,7 @@ class simulate:
 
         # Convolve with the spectral response function (SRF)
         if SRF is not None:
-            kernel = self.get_SRF(SRF, nover=nover)
+            kernel = self.get_SRF(SRF, Nup=Nup)
             mvis_pure = convolve1d(mvis_, kernel, axis=1, mode='nearest')
         else:
             mvis_pure = 1. * mvis_
@@ -184,7 +181,7 @@ class simulate:
             sigma_out = 1e-3 * noise_inject * np.sqrt(dset.npol * dset.nvis)
 
             # Scale to account for spectral oversampling and SRF
-            sigma_noise = sigma_out * np.sqrt(nover * 8./3.)
+            sigma_noise = sigma_out * np.sqrt(Nup * 8./3.)
 
             # Random Gaussian noise draws
             noise = np.random.normal(0, sigma_noise,
@@ -193,7 +190,7 @@ class simulate:
 
         # Decimate, strip pads, and return a model dataset
         if noise_inject is None:
-            mvis_pure = mvis_pure[:,::nover,:,:]
+            mvis_pure = mvis_pure[:,::Nup,:,:]
             mvis_pure = mvis_pure[:,chpad:-chpad,:,:]
             mvis_p = mvis_pure[:,:,:,0] + 1j * mvis_pure[:,:,:,1]
             mset = dataset(dset.um, dset.vm, mvis_p, dset.wgt, dset.nu_TOPO,

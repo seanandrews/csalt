@@ -116,9 +116,7 @@ def loadMS(msfile):
         data[str(EB)] = dataset(u, v, vis, wgts, nu_TOPO, nu_LSRK, tstamp_ID)
 
         # clean up the temporary MS
-        os.system('rm -rf '+tmp_MS+'*')
+        if nEB > 1:
+            os.system('rm -rf '+tmp_MS+'*')
 
     return data
-
-
-

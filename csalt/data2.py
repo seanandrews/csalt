@@ -1,8 +1,10 @@
 import os, sys
+import copy
 import numpy as np
 import casatasks
 import casatools
 import scipy.constants as sc
+
 
 # General visibility dataset object
 class dataset:
@@ -31,95 +33,73 @@ class dataset:
 
 
 
-# General function to load an MS file (containing an arbitrary number of EBs) 
-# to a data dictionary containing datasets for each observation.
-def loadMS(msfile):
+# Function to read contents of MS file into a dictionary
+def read_MS(msfile):
 
     # Make sure the file exists
     if not os.path.exists(msfile):
         print('I cannot find '+msfile+'.  Exiting.')
         return
 
-    # Load the basic MS file information
-    tb = casatools.table()
-    tb.open(msfile)
-    obs_col = tb.getcol('OBSERVATION_ID')
-    SPW_col = tb.getcol('DATA_DESC_ID')
-    field_col = tb.getcol('FIELD_ID')
-    tb.close()
+    # Ingest the SPW dictionary
+    ms = casatools.ms()
+    ms.open(msfile)
+    spw_dict = ms.getspectralwindowinfo()
+    ms.close()
 
-    # Identify the distinct EBs in the input MS
-    EB_ids = np.unique(obs_col)
-    nEB = len(EB_ids)
+    # Identify the number of distinct execution blocks
+    Nobs = len(spw_dict)
 
     # Initialize a data dictionary
-    data = {'nEB': nEB, 'input_file':msfile}
+    data_dict = {'Nobs': Nobs, 'input_file': msfile}
 
-    # Cycle through EBs to load information into individual dataset objects, 
-    # packed into the data dictionary (if nEB = 1, just load directly)
-    for EB in range(nEB):
-        # prepare a temporary MS filename
-        if nEB == 1:
-            tmp_MS = msfile
-        else:
-            tmp_MS = 'tmp_'+str(EB)+'.ms'
-            os.system('rm -rf '+tmp_MS+'*')
+    # Loop over executions to load information into dataset objects, packed 
+    # into the data dictionary
+    for EB in range(Nobs):
 
-            # identify unique SPWs and fields
-            spws = np.unique(SPW_col[np.where(obs_col == EB_ids[EB])])
-            fields = np.unique(field_col[np.where(obs_col == EB_ids[EB])])
-            spw_str = "%d~%d" % (spws[0], spws[-1])
+        # compute the TOPO frequencies
+        spw = spw_dict[str(EB)]
+        nu = spw['Chan1Freq'] + spw['ChanWidth'] * np.arange(spw['NumChan'])
 
-            # SPW and field strings
-            if len(spws) == 1:
-                spw_str = str(spws[0])
-            else:
-                spw_str = "%d~%d" % (spws[0], spws[-1])
-            if len(fields) == 1:
-                field_str = str(fields[0])
-            else:
-                field_str = "%d~%d" % (fields[0], fields[-1])
+        # open the MS file for this EB
+        ms.open(msfile)
+        ms.selectinit(datadescid=EB)
 
-            # split to a temporary MS file
-            casatasks.split(msfile, outputvis=tmp_MS, datacolumn='data',
-                            spw=spw_str, field=field_str, keepflags=False)
+        # load the data into a dictionary
+        d = ms.getdata(['data', 'weight', 'u', 'v', 'time'])
 
-        # load the data from the split MS file
-        tb.open(tmp_MS)
-        vis = np.squeeze(tb.getcol('DATA'))
-        u, v = tb.getcol('UVW')[0,:], tb.getcol('UVW')[1,:]
-        wgts = tb.getcol('WEIGHT')
-        times = tb.getcol('TIME')
-        tb.close()
+        # identify the unique timestamps
+        tstamps = np.unique(d['time'])
 
-        # index the timestamps
-        tstamps = np.unique(times)
-        tstamp_ID = np.empty_like(times)
+        # timestamp index and LSRK frequency grids
+        tstamp_ID = np.empty_like(d['time'])
+        nu_ = np.empty((len(tstamps), len(nu)))
+
+        # loop over timestamps to populate index and LSRK frequency grids
         for istamp in range(len(tstamps)):
-            tstamp_ID[times == tstamps[istamp]] = istamp
 
-        # acquire the TOPO frequency channels
-        tb.open(tmp_MS+'/SPECTRAL_WINDOW')
-        nu_TOPO = np.squeeze(tb.getcol('CHAN_FREQ'))
-        tb.close()
+            tstamp_ID[d['time'] == tstamps[istamp]] = istamp
 
-        # compute the LSRK frequencies for each timestamp
-        ms = casatools.ms()
-        nu_LSRK = np.empty((len(tstamps), len(nu_TOPO)))
-        ms.open(tmp_MS)
-        for istamp in range(len(tstamps)):
-            nu_LSRK[istamp,:] = ms.cvelfreqs(mode='channel', outframe='LSRK',
-                                             obstime=str(tstamps[istamp])+'s')
+            nu_[istamp,:] = ms.cvelfreqs(spwids=[EB],
+                                         mode='channel', 
+                                         outframe='LSRK',
+                                         obstime=str(tstamps[istamp])+'s')
+
+        # close the MS file
         ms.close()
 
-        # append a dataset object to the dataset dictionary
-        data[str(EB)] = dataset(u, v, vis, wgts, nu_TOPO, nu_LSRK, tstamp_ID)
+        # append a dataset object to the data dictionary
+        data_dict[str(EB)] = dataset(d['u'], 
+                                     d['v'], 
+                                     d['data'], 
+                                     d['weight'],
+                                     nu, 
+                                     nu_,
+                                     tstamp_ID)
 
-        # clean up the temporary MS
-        if nEB > 1:
-            os.system('rm -rf '+tmp_MS+'*')
+    return data_dict
 
-    return data
+        
 
 
 
@@ -142,9 +122,9 @@ def writeMS(datadict, outfile='out.ms'):
 
     # Cycle through EBs to replace information
     pure_files =[]
-    for EB in range(datadict['nEB']):
+    for EB in range(datadict['Nobs']):
         # prepare a temporary MS filename
-        if datadict['nEB'] == 1:
+        if datadict['Nobs'] == 1:
             tmp_MS = outfile
             os.system('rm -rf '+outfile)
             os.system('cp -r '+datadict['input_file']+' '+outfile)
@@ -183,13 +163,10 @@ def writeMS(datadict, outfile='out.ms'):
         pure_files += [tmp_MS]
 
     # concatenate if necessary
-    if datadict['nEB'] > 1:
+    if datadict['Nobs'] > 1:
         os.system('rm -rf '+outfile)
         casatasks.concat(pure_files, concatvis=outfile, dirtol='0.1arcsec',
                          copypointing=False)
         [os.system('rm -rf '+i) for i in pure_files]
 
     return
-
-
-       

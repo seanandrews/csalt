@@ -73,7 +73,7 @@ class simulate:
         modeldict = copy.deepcopy(datadict)
 
         # Loop over constituent observations to calculate modelsets
-        EBlist = range(datadict['nEB'])
+        EBlist = range(datadict['Nobs'])
         for EB in EBlist:
             modeldict[str(EB)] = self.modelset(datadict[str(EB)], pars,
                                                restfreq=restfreq, FOV=FOV,

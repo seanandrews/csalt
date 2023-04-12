@@ -99,74 +99,39 @@ def read_MS(msfile):
 
     return data_dict
 
-        
 
 
+# Function to write a model or residual visibilities back to an MS file
+def write_MS(data_dict, outfile='out.ms', resid=False):
 
-def writeMS(datadict, outfile='out.ms'):
-
-    # Check that the original input MS file can be located.
-    if not os.path.exists(datadict['input_file']):
-        print('I cannot find the input MS file '+datadict['input_file']+\
+    # Copy the input MS file to the output file.
+    if not os.path.exists(data_dict['input_file']):
+        print('I cannot find the input MS file '+data_dict['input_file']+\
               ' to make a copy.  Exiting.')
         return
-
-    # Load the basic MS file information
-    tb = casatools.table()
-    tb.open(datadict['input_file'])
-    obs_col = tb.getcol('OBSERVATION_ID')
-    SPW_col = tb.getcol('DATA_DESC_ID')
-    field_col = tb.getcol('FIELD_ID')
-    tb.close()
-    EB_ids = np.unique(obs_col)
-
-    # Cycle through EBs to replace information
-    pure_files =[]
-    for EB in range(datadict['Nobs']):
-        # prepare a temporary MS filename
-        if datadict['Nobs'] == 1:
-            tmp_MS = outfile
-            os.system('rm -rf '+outfile)
-            os.system('cp -r '+datadict['input_file']+' '+outfile)
-        else:
-            tmp_MS = 'tmp_'+str(EB)+'.ms'
-            os.system('rm -rf '+tmp_MS+'*')
-
-            # identify unique SPWs and fields
-            spws = np.unique(SPW_col[np.where(obs_col == EB_ids[EB])])
-            fields = np.unique(field_col[np.where(obs_col == EB_ids[EB])])
-            spw_str = "%d~%d" % (spws[0], spws[-1])
-
-            # SPW and field strings
-            if len(spws) == 1:
-                spw_str = str(spws[0])
-            else:
-                spw_str = "%d~%d" % (spws[0], spws[-1])
-            if len(fields) == 1:
-                field_str = str(fields[0])
-            else:
-                field_str = "%d~%d" % (fields[0], fields[-1])
-
-            # split to a temporary MS file
-            casatasks.split(datadict['input_file'], outputvis=tmp_MS, 
-                            datacolumn='data', spw=spw_str, field=field_str, 
-                            keepflags=False)
-
-        # pack the appropriate dataset into each MS file
-        tb.open(tmp_MS, nomodify=False)
-        tb.putcol('DATA', datadict[str(EB)].vis)
-        tb.putcol('WEIGHT', datadict[str(EB)].wgt)
-        tb.flush()
-        tb.close()
-
-        # update file lists
-        pure_files += [tmp_MS]
-
-    # concatenate if necessary
-    if datadict['Nobs'] > 1:
+    else:
         os.system('rm -rf '+outfile)
-        casatasks.concat(pure_files, concatvis=outfile, dirtol='0.1arcsec',
-                         copypointing=False)
-        [os.system('rm -rf '+i) for i in pure_files]
+        os.system('cp -r '+data_dict['input_file']+' '+outfile)
+
+    # Loop over the observations to pack into the MS file.
+    ms = casatools.ms()
+    for EB in range(data_dict['Nobs']):
+
+        # open the MS file for this EB
+        ms.open(outfile, nomodify=False)
+        ms.selectinit(datadescid=EB)
+
+        # pull the data array
+        d = ms.getdata(['data'])
+
+        # replace with the model array or the residuals
+        if resid:
+            d['data'] -= data_dict[str(EB)].vis
+        else:
+            d['data'] = data_dict[str(EB)].vis
+        ms.putdata(d)
+
+        # close the MS file
+        ms.close()
 
     return

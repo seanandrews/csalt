@@ -17,6 +17,7 @@ class simulate:
         self.path = path
 
 
+
     """ Generate a cube """
     def cube(self, velax, pars, 
              restfreq=230.538e9, FOV=5.0, Npix=256, dist=150):
@@ -44,8 +45,9 @@ class simulate:
         return pd.parametric_disk(velax, pars, fixed)
 
 
+
     """ Spectral Response Functions (SRF) """
-    def get_SRF(self, srf_type, Nup=1):
+    def SRF_kernel(self, srf_type, Nup=1):
         
         if srf_type == 'ALMA':
             # if spectra are oversampled, use the full kernel
@@ -57,10 +59,13 @@ class simulate:
             # otherwise use the simplification of an "in-place" convolution
             else:
                 srf_ = np.array([0.00, 0.25, 0.50, 0.25, 0.00])
+        elif srf_type == 'WSU':
+            print('still working on it!')
         else:
             print('Which SRF?')
         
         return srf_ / np.sum(srf_)
+
 
 
     """ Generate simulated data ('model') """
@@ -170,7 +175,7 @@ class simulate:
 
         # Convolve with the spectral response function (SRF)
         if SRF is not None:
-            kernel = self.get_SRF(SRF, Nup=Nup)
+            kernel = self.SRF_kernel(SRF, Nup=Nup)
             mvis_pure = convolve1d(mvis_, kernel, axis=1, mode='nearest')
         else:
             mvis_pure = 1. * mvis_

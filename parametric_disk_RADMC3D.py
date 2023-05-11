@@ -41,12 +41,16 @@ def parametric_disk(velax, pars, pars_fixed,
     r0 = 10 * _AU
     Tmin, Tmax = 0., 1000.
 
+    # Set up the Keplerian angular velocity
+    def omega_Kep(r, z):
+        return np.sqrt(_G * (mstar * _msun) / np.hypot(r, z)**3)
 
     # Set up the temperature structure function
     def T_gas(r, z):
         r, z = np.atleast_1d(r), np.atleast_1d(z)
         Tmid, Tatm = Tmid0 * (r / r0)**qmid, Tatm0 * (r / r0)**qatm	
-        zqr = zq * r
+        zqr = zq * np.sqrt(_k * Tmid / (_mu * _mH)) / \
+              omega_Kep(r, np.zeros_like(r))
         fz = (np.cos(np.pi * z / (2 * zqr)))**deltaT
         Tgas = Tatm + (Tmid - Tatm) * fz
         Tout = np.where(z >= zqr, Tatm, Tgas)
@@ -56,11 +60,6 @@ def parametric_disk(velax, pars, pars_fixed,
     def Sigma_gas(r):
         sig = Sig0 * (r / r0)**p1 * np.exp(-(r / (r_l * _AU))**p2)
         return np.clip(sig, a_min=1e-50, a_max=1e50)
-
-    # Set up the Keplerian angular velocity
-    def omega_Kep(r, z):
-        return np.sqrt(_G * (mstar * _msun) / np.hypot(r, z)**3)
-
 
     # Set up the abundance function
     def abund(r, z):

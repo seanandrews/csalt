@@ -2,7 +2,6 @@ import os
 import sys
 import copy
 import numpy as np
-import casatasks
 import casatools
 import scipy.constants as sc
 

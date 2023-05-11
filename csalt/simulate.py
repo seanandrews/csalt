@@ -1,4 +1,6 @@
-import os, sys, importlib
+import os
+import sys
+import importlib
 import numpy as np
 import warnings
 import copy
@@ -8,14 +10,18 @@ from scipy.interpolate import interp1d
 from vis_sample import vis_sample
 from csalt.data2 import *
 
+"""
+The simulate class for generating model cubes and visibilities.
+"""
 class simulate:
 
     def __init__(self, prescription, path=None, quiet=True):
+
         if quiet:
             warnings.filterwarnings("ignore")
+
         self.prescription = prescription
         self.path = path
-
 
 
     """ Generate a cube """
@@ -23,7 +29,8 @@ class simulate:
              restfreq=230.538e9, FOV=5.0, Npix=256, dist=150):
 
         # Parse inputs
-        if isinstance(velax, list): velax = np.array(velax)
+        if isinstance(velax, list): 
+            velax = np.array(velax)
         fixed = restfreq, FOV, Npix, dist, {}
 
         # Locate the prescription file
@@ -36,7 +43,7 @@ class simulate:
             pfile = 'parametric_disk_'+self.prescription
         if not os.path.exists(pfile+'.py'):
             print('The prescription '+pfile+'.py does not exist.  Exiting.')
-            return
+            sys.exit()
 
         # Load the appropriate precription
         pd = importlib.import_module(pfile)
@@ -45,22 +52,23 @@ class simulate:
         return pd.parametric_disk(velax, pars, fixed)
 
 
-
     """ Spectral Response Functions (SRF) """
     def SRF_kernel(self, srf_type, Nup=1):
         
+        # The ALMA baseline correlator 
         if srf_type == 'ALMA':
-            # if spectra are oversampled, use the full kernel
             if Nup > 1:
                 chix = np.arange(25 * Nup) / Nup
                 xch = chix - np.mean(chix)
                 srf_ = 0.5 * np.sinc(xch) + \
                        0.25 * np.sinc(xch - 1) + 0.25 * np.sinc(xch + 1)
-            # otherwise use the simplification of an "in-place" convolution
             else:
                 srf_ = np.array([0.00, 0.25, 0.50, 0.25, 0.00])
-        elif srf_type == 'WSU':
-            print('still working on it!')
+
+        # The ALMA WSU correlator
+        elif srf_type == 'ALMA-WSU':
+            sdat = np.load('WSU_SRF.npz')
+
         else:
             print('Which SRF?')
         

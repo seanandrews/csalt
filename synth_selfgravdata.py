@@ -2,7 +2,7 @@ import os, sys, importlib
 from csalt.synthesize import make_template, make_data
 from csalt.utils import *
 sys.path.append('configs/')
-from parametric_disk_RADMC3D2 import parametric_disk as pardisk_radmc
+from parametric_disk_RADMC3D import parametric_disk as pardisk_radmc
 from csalt.models import cube_to_fits
 
 
@@ -13,7 +13,7 @@ from csalt.models import cube_to_fits
 
 #cfg = ['sg_taper2hi_kep', 'sg_taper2hi_prs', 'sg_taper2hi_sg']
 #cfg = ['sg_modelc', 'sg_modela', 'sg_modelc']
-cfg = ['sg_modeld']
+cfg = ['sg_modelbi']#, 'sg_modelc']
 
 do_raw = True
 raw_tau_only = False
@@ -58,8 +58,6 @@ for i in range(len(cfg)):
         taur = pardisk_radmc(velax, inp.pars, fixed, tausurf=True)
 
         sys.exit()
-
-
 
         # make a "raw" cube calculation on the pure/noisy cube velocities
 #        else:

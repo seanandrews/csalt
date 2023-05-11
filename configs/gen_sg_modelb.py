@@ -108,21 +108,21 @@ PA    = 130.
 mstar = 1.0
 
 Tmid0 = 50.	#.75.	
-Tatm0 = 200. 
+Tatm0 = 150. 
 qmid  = -0.5
 qatm  = -0.5
-zq    = 0.3	#0.25
-deltaT = 2.0
+zq    = 2.	#0.25
+deltaT = 3.0
 
-Sig0  = 99.8
+Sig0  = 91.25
 p1    = -1.0
 p2    = 2.0
-r_l   = 160.
+r_l   = 175.
 
 xmol  = 1e-5
 depl  = 1e-3
 Tfrz  = 20.
-Ncrit = 1.8 * 1.6e21	#1.9
+Ncrit = 1.575 * 1.6e21	#1.9
 rmax_abund = 5000.
 
 xi    = 0.0
@@ -165,7 +165,7 @@ cfg_dict = {'radmcname': radmcname, 'grid_params': grid_params,
 """
 chanstart = '-5.6km/s'
 chanwidth = '0.08km/s'
-nchan_out = 140
+nchan_out = 141
 imsize = 512
 cell = '0.02arcsec'
 scales = [0, 10, 30, 50]

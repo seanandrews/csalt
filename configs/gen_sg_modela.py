@@ -108,21 +108,21 @@ PA    = 130.
 mstar = 1.0
 
 Tmid0 = 50.	
-Tatm0 = 200. 
+Tatm0 = 150. 
 qmid  = -0.5
 qatm  = -0.5
-zq = 0.3
-deltaT = 2.0
+zq = 2.0
+deltaT = 3.0
 
-Sig0  = 202.3	#218.0	#283.4	#149.	#283.4	
+Sig0  = 188.796	#218.0	#283.4	#149.	#283.4	
 p1    = -1.0
 p2    = 1.0
-r_l   = 70.	#60.	#95.	#50.
+r_l   = 75.	#60.	#95.	#50.
 
 xmol  = 1e-5
 depl  = 1e-3
 Tfrz  = 20.
-Ncrit = 1.6*1.6e21	#0.28*1.6e21
+Ncrit = 1.575*1.6e21	#0.28*1.6e21
 rmax_abund = 5000.
 
 xi    = 0.0
@@ -165,7 +165,7 @@ cfg_dict = {'radmcname': radmcname, 'grid_params': grid_params,
 """
 chanstart = '-5.6km/s'
 chanwidth = '0.08km/s'
-nchan_out = 140
+nchan_out = 141
 imsize = 512
 cell = '0.02arcsec'
 scales = [0, 10, 30, 50]
@@ -177,7 +177,7 @@ uvtaper = ''
 
 # Keplerian mask
 zr = 0.3
-r_max = 1.3 * 300 / dist
+r_max = 1.5 * 300 / dist
 nbeams = 2
 
 

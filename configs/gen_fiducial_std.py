@@ -150,7 +150,7 @@ nbeams = 1.5
     ADDITIONAL MISCELLANY:
 """
 # process phase center into degrees
-RA_pieces = [np.float(RA.split(':')[i]) for i in np.arange(3)]
+RA_pieces = [float(RA.split(':')[i]) for i in np.arange(3)]
 RAdeg = 15 * np.sum(np.array(RA_pieces) / [1., 60., 3600.])
-DEC_pieces = [np.float(DEC.split(':')[i]) for i in np.arange(3)]
+DEC_pieces = [float(DEC.split(':')[i]) for i in np.arange(3)]
 DECdeg = np.sum(np.array(DEC_pieces) / [1., 60., 3600.])

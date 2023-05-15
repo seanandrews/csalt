@@ -1,25 +1,84 @@
 import os
 import sys
+import datetime
 import importlib
 import numpy as np
 import scipy.constants as sc
-sys.path.append("/home/sandrews/casatools/analysis_scripts/")
-import analysisUtils as au
 from casatasks import (simobserve, concat)
 import casatools
 import warnings
+
+# Load the measures and quanta tools
+me = casatools.measures()
+qa = casatools.quanta()
 
 """
 The create class
 """
 class create:
 
-    def __init__(self, path=None, quiet=True):
+    def __init__(self, quiet=True):
 
         if quiet:
             warnings.filterwarnings("ignore")
 
-        self.path = path
+
+    def LST_to_UTC(self, date, LST, longitude):
+        
+        # Parse input LST into hours
+        h, m, s = LST.split(LST[2])
+        LST_hours = int(h) + int(m) / 60. + float(s) / 3600.
+
+        # Calculate the MJD
+        mjd = me.epoch('utc', date)['m0']['value']
+        jd = mjd + 2400000.5
+        T = (jd - 2451545.0) / 36525.0
+        sidereal = 280.46061837 + 360.98564736629 * (jd - 2451545.) \
+                   + 0.000387933*T**2 - (1. / 38710000.)*T**3
+        sidereal += longitude
+        sidereal /= 360.
+        sidereal -= np.floor(sidereal)
+        sidereal *= 24.0
+        if (sidereal < 0): sidereal += 24
+        if (sidereal >= 24): sidereal -= 24
+        delay = (LST_hours - sidereal) / 24.0
+        if (delay < 0.0): delay += 1.0
+        mjd += delay / 1.002737909350795
+
+        # Convert to UTC date/time string
+        today = me.epoch('utc', 'today')
+        today['m0']['value'] = mjd
+        hhmmss = qa.time(today['m0'], form='', prec=6, showform=False)[0]
+        dt = qa.splitdate(today['m0'])
+        ut = '%s%s%02d%s%02d%s%s' % \
+             (dt['year'], '/', dt['month'], '/', dt['monthday'], '/', hhmmss)
+
+        return ut
+
+
+    def doppler_set(self, nu_rest, vel_tune, datestring, RA, DEC, 
+                    equinox='J2000', observatory='ALMA'):
+
+        # Set direction and epoch
+        position = me.direction(equinox, RA, DEC.replace(':', '.'))
+        obstime = me.epoch('utc', datestring)
+
+        # Define the radial velocity
+        rvel = me.radialvelocity('LSRK', str(vel_tune * 1e-3)+'km/s')
+
+        # Define the observing frame
+        me.doframe(position)
+        me.doframe(me.observatory(observatory))
+        me.doframe(obstime)
+        me.showframe()
+
+        # Convert to the TOPO frame
+        rvel_top = me.measure(rvel, 'TOPO')
+        dopp = me.todoppler('RADIO', rvel_top)
+        nu_top = me.tofrequency('TOPO', dopp,
+                                me.frequency('rest', str(nu_rest / 1e9)+'GHz'))
+
+        return nu_top['m0']['value']
 
 
     """ Create a blank MS template """
@@ -27,11 +86,11 @@ class create:
                     RA='16:00:00.00', DEC='-30:00:00.00', nu_rest=230.538e9, 
                     dnu_native=122e3, V_span=10e3, V_tune=0.0e3,
                     t_integ='6s', HA_0='0h', date='2023/03/20',
-                    XXX=0):
+                    observatory='ALMA'):
 
         # Parse / determine the executions
         if np.isscalar(config): config = np.array([config])
-        if np.isscalar(t_total): t_integ = np.array([t_total])
+        if np.isscalar(t_total): t_total = np.array([t_total])
         Nobs = len(config)
 
         # things to format check:
@@ -62,25 +121,36 @@ class create:
             # Calculate the number of native channels
             nch = 2 * int(V_span[i] / (sc.c * dnu_native[i] / nu_rest)) + 1
 
-            # Convert RA, DEC coordinates into degrees
-            RA_  = np.array([float(RA.split(':')[j]) for j in range(3)])
-            DEC_ = np.array([float(DEC.split(':')[j]) for j in range(3)])
-            dms = np.array([1, 60, 3600])
-            RAdeg, DECdeg = 15 * np.sum(RA_ / dms), np.sum(DEC_ / dms)
+            # Calculate the LST starting time of the execution block
+            h, m, s = RA.split(':')
+            LST_h = int(h) + int(m)/60 + float(s)/3600 + float(HA_0[i][:-1])
+            LST_0 = str(datetime.timedelta(hours=LST_h))
+            if (LST_h < 10.): LST_0 = '0' + LST_0
+
+            # Get the observatory longitude
+            obs_long = np.degrees(me.observatory(observatory)['m0']['value'])
 
             # Calculate the UT starting time of the execution block
-            LST_0 = au.hoursToHMS(RAdeg / 15 + float((HA_0[i])[:-1]))
-            UT_0  = au.lstToUT(LST_0, date[i])
-            dUT_0 = UT_0[0][:-3].replace('-', '/').replace(' ', '/')
+            UT_0 = self.LST_to_UTC(date[i], LST_0, obs_long)
 
-            # Calculate the TOPO frequency = tuning velocity (SPW center)
-            nu_tune = au.restToTopo(nu_rest, 1e-3 * V_tune[i], dUT_0, RA, DEC)
+            # Calculate the TOPO tuning frequency
+            nu_tune_0 = self.doppler_set(nu_rest, V_tune[i], UT_0, RA, DEC, 
+                                         observatory=observatory)
 
             # Generate a dummy (empty) cube
             ia = casatools.image()
             dummy = ia.makearray(v=0.001, shape=[64, 64, 4, nch])
             ia.fromarray(outfile='dummy.image', pixels=dummy, overwrite=True)
             ia.done()
+
+            # Compute the midpoint HA
+            if (t_total[i][-1] == 'h'):
+                tdur = float(t_total[i][:-1])
+            elif (t_total[i][-3:] == 'min'):
+                tdur = float(t_total[i][:-3]) / 60
+            elif (t_total[i][-1] == 's'):
+                tdur = float(t_total[i][:-1]) / 3600
+            HA_mid = str(float(HA_0[i][:-1]) + 0.5 * tdur) +'h'
 
             # Generate the template sub-MS file
             simobserve(project=out_name[:-3]+'_'+str(i)+'.sim',
@@ -89,12 +159,12 @@ class create:
                        totaltime=t_total[i], 
                        integration=t_integ[i],
                        thermalnoise='', 
-                       hourangle=HA_0[i], 
+                       hourangle=HA_mid, 
                        indirection='J2000 '+RA+' '+DEC, 
                        refdate=date[i],
                        incell='0.01arcsec', 
                        mapsize='5arcsec',
-                       incenter=str(nu_tune / 1e9)+'GHz',
+                       incenter=str(nu_tune_0 / 1e9)+'GHz',
                        inwidth=str(dnu_native[i] * 1e-3)+'kHz', 
                        outframe='TOPO')
 

@@ -35,7 +35,7 @@ class simulate:
 
         # Locate the prescription file
         if self.path is not None:
-            if self.path[-1] is not '/':
+            if self.path[-1] != '/':
                 pfile = self.path+'/parametric_disk_'+self.prescription
             else:
                 pfile = self.path+'parametric_disk_'+self.prescription
@@ -125,7 +125,6 @@ class simulate:
 
         # Calculate LSRK velocities
         vel = sc.c * (1 - nu / restfreq)
-
 
         ### - Compute the model visibilities
         mvis_ = np.squeeze(np.empty((dset.npol, nch, dset.nvis, 2)))

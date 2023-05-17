@@ -16,6 +16,7 @@ class dataset:
         # Spectral frequencies in Hz units (LSRK for each timestamp)
         self.nu_TOPO = nu_TOPO
         self.nu_LSRK = nu_LSRK
+        self.nchan = len(nu_TOPO)
 
         # Spatial frequencies in meters and lambda units
         self.um = um
@@ -29,7 +30,7 @@ class dataset:
         self.tstamp = tstamp_ID
 
         # Utility size trackers
-        self.npol, self.nchan, self.nvis = vis.shape
+        self.npol, self.nvis = vis.shape[0], vis.shape[2]
         self.nstamps = len(np.unique(tstamp_ID))
 
 

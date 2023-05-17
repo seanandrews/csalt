@@ -47,7 +47,7 @@ class infer:
 
         # Loop over executions
         for i in range(data_dict['Nobs']):
-            
+
             # Pull the dataset object for this execution
             data = data_dict[str(i)]
 
@@ -64,13 +64,15 @@ class infer:
             dv, dvra = np.diff(v_LSRK, axis=1), np.diff(vra)
             if np.logical_or(np.logical_and(np.all(dv < 0), np.all(dvra > 0)),
                              np.logical_and(np.all(dv < 0), np.all(dvra < 0))):
-                vra = vra[::-1]
-            sgn_v = np.sign(np.diff(vra)[0])
+                vra_ = vra[::-1]
+            else:
+                vra_ = 1. * vra
+            sgn_v = np.sign(np.diff(vra_)[0])
 
             # Find where to clip to lie within the desired velocity bounds
             midstamp = int(data.nstamps / 2)
-            ixl = np.abs(v_LSRK[midstamp,:] - vra[0]).argmin()
-            ixh = np.abs(v_LSRK[midstamp,:] - vra[1]).argmin()
+            ixl = np.abs(v_LSRK[midstamp,:] - vra_[0]).argmin()
+            ixh = np.abs(v_LSRK[midstamp,:] - vra_[1]).argmin()
 
             # Adjust indices to ensure they are evenly divisible by chbin
             if np.logical_and((chbin[i] > 1), ((ixh - ixl) % chbin[i] != 0)):
@@ -91,7 +93,7 @@ class infer:
             inu_TOPO = data.nu_TOPO[ixl:ixh]
             inu_LSRK = data.nu_LSRK[:,ixl:ixh]
             iv_LSRK = v_LSRK[:,ixl:ixh]
-            inchan = data.nu_LSRK.shape[1]
+            inchan = inu_LSRK.shape[1]
             ivis = data.vis[:,ixl:ixh,:]
             iwgt = data.wgt[:,ixl:ixh,:]
 

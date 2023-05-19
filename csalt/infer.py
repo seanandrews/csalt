@@ -6,6 +6,7 @@ import numpy as np
 from scipy import linalg
 import scipy.constants as sc
 from csalt.data2 import *
+from csalt.simulate import *
 
 
 """
@@ -20,6 +21,7 @@ class infer:
 
         self.prescription = prescription
         self.path = path
+        self.sim = simulate(self.prescription)
 
 
     """ Parse and package data for inference """
@@ -136,19 +138,21 @@ class infer:
 
             # If well-conditioned (usually for binned), do direct inversion
             if np.linalg.cond(scov) <= well_cond:
-                print('SCOV inverted with direct calculation.')
+                print('EB '+str(i)+' SCOV inverted with direct calculation.')
                 scov_inv = linalg.inv(scov)
 
             # See if you can use Cholesky factorization
             else:
                 chol = linalg.cholesky(scov)
                 if np.linalg.cond(chol) <= well_cond:
-                    print('SCOV inverted with Cholesky factorization')
+                    print('EB '+str(i)+' SCOV inverted with Cholesky' 
+                          + ' factorization')
                     scov_inv = np.dot(linalg.inv(chol), linalg.inv(chol.T))
                 
                 # Otherwise use SVD
                 else:
-                    print('SCOV inverted with singular value decomposition')
+                    print('EB '+str(i)+' SCOV inverted with singular value' 
+                          + ' decomposition')
                     uu, ss, vv = linalg.svd(scov)
                     scov_inv = np.dot(vv.T, np.dot(np.diag(ss**-1), uu.T))
 
@@ -177,3 +181,38 @@ class infer:
 
         # Return the output dictionary
         return out_dict
+
+
+    """ Log-likelihood calculation """
+    def log_likelihood(self, theta, fdata=None):
+
+        # Compute model visibility spectra
+        fmodel = self.sim.model(fdata, theta, FOV=6.375, Npix=256, dist=150)
+
+        # Loop over observations to get likelihood
+        logL = 0
+        for i in range(fdata['Nobs']):
+
+            # Get the data and model visibility spectra
+            _data, _mdl = fdata[str(i)], fmodel[str(i)]
+
+            # Spectrally bin the model visibilities if necessary
+            # **technically wrong, since the weights are copied like this; 
+	    # **ideally would propagate the unbinned weights?
+            if fdata['chbin'][i] > 1:
+                oshp = (_mdl.npol, -1, fdata['chbin'][i], _mdl.nvis)
+                wt = np.rollaxis(np.tile(_data.wgt, (2, 1, 1, 1)), 0, 3)
+                mvis = np.average(_mdl.vis.reshape(oshp), 
+                                  weights=wt.reshape(oshp), axis=2)
+            else:
+                mvis = 1. * _mdl.vis
+
+            # Compute the residual and variance matrices(stack both pols)
+            resid = np.hstack(np.absolute(_data.vis - mvis))
+            var = np.hstack(_data.wgt)
+
+            # Compute the log-likelihood
+            Cinv = fdata['invcov_'+str(i)]
+            logL += -0.5 * np.tensordot(resid, np.dot(Cinv, var * resid))
+
+        return logL

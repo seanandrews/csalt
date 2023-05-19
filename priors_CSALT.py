@@ -1,13 +1,14 @@
 import os, sys
 import numpy as np
+import scipy.constants as sc
 
 ### User inputs
-pri_types = ['uniform', 'uniform', 'uniform', 'uniform', 'uniform',
-             'uniform', 'uniform', 'uniform', 'uniform', 'uniform',
-             'uniform', 'uniform', 'uniform', 'uniform', 'uniform']
-pri_pars = [ [0, 90], [0, 180], [0.5, 1.5], [150, 350], [0.0, 0.5],
-             [0.0, 2.0], [50, 250], [-1, 0], [5, 100], [50, 700],
-             [1.0, 4.0], [-2, 0], [4e3, 6e3], [-0.1, 0.1], [-0.1, 0.1] ]
+pri_types = [ 'normal',  'normal', 'uniform',  'normal', 'uniform',
+              'normal', 'uniform',  'normal', 'uniform', 'linewidth',
+             'uniform', 'uniform',  'normal',  'normal',  'normal']
+pri_pars = [ [40, 2], [130, 2], [0.5, 1.5], [250, 50], [0.0, 0.5],
+             [1.25, 0.5], [50, 300], [-0.5, 0.2], [5, 100], [1000],
+             [1.0, 4.0], [-2, 0], [5e3, 2.5e2], [0.0, 0.05], [0.0, 0.05] ]
 
 
 ### Pre-defined standard functions
@@ -20,9 +21,17 @@ def logprior_uniform(theta, ppars):
 
 # Gaussian prior: ppars = [mean, std dev]
 def logprior_normal(theta, ppars):
-    foo = np.log(ppars[1] * np.sqrt(2 * np.pi)) + \
-          0.5 * ((theta - ppars[0])**2 / ppars[1]**2) 
-    return -foo
+    foo = -np.log(ppars[1] * np.sqrt(2 * np.pi)) \
+          -0.5 * ((theta - ppars[0])**2 / ppars[1]**2) 
+    return foo
+
+# special line-width prior
+def logprior_linewidth(theta, ppars):
+    lw0 = np.sqrt(2 * sc.k * ppars[1] / (28 * (sc.m_p + sc.m_e)))
+    if np.logical_and((theta >= lw0), (theta <= ppars[0])):
+        return 0
+    else:
+        return -np.inf
 
 
 ### Log-Prior calculator
@@ -32,6 +41,7 @@ def logprior(theta):
     logptheta = np.empty_like(theta)
 
     # user-defined calculations
+    pri_pars[9] = [pri_pars[9][0], theta[6]]
     for i in range(len(theta)):
         cmd = 'logprior_'+pri_types[i]+'(theta['+str(i)+'], '+\
               str(pri_pars[i])+')'

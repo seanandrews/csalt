@@ -22,6 +22,7 @@ class infer:
         self.prescription = prescription
         self.path = path
         self.sim = simulate(self.prescription)
+        self.priors = importlib.import_module('priors_'+self.prescription)
 
 
     """ Parse and package data for inference """
@@ -211,8 +212,24 @@ class infer:
             resid = np.hstack(np.absolute(_data.vis - mvis))
             var = np.hstack(_data.wgt)
 
-            # Compute the log-likelihood
+            # Compute the log-likelihood (** still needs constant term)
             Cinv = fdata['invcov_'+str(i)]
             logL += -0.5 * np.tensordot(resid, np.dot(Cinv, var * resid))
 
         return logL
+
+
+    """ Log-posterior calculation """
+    def log_posterior(self, theta, fdata=None, kwargs=None):
+
+        # Calculate log-prior
+        lnT = np.sum(self.priors.logprior(theta)) * fdata['Nobs']
+        if lnT == -np.inf:
+            return -np.inf, -np.inf
+
+        # Compute log-likelihood
+        lnL = self.log_likelihood(theta, fdata=fdata, kwargs=kwargs)
+
+        # return the log-posterior and the log-prior
+        return lnL + lnT, lnT
+        

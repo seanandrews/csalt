@@ -77,10 +77,28 @@ class simulate:
 
 
     """ Generate simulated data ('model') """
-    def model(self, datadict, pars,
-              restfreq=230.538e9, FOV=5.0, Npix=256, dist=150,
-              chpad=3, Nup=None, noise_inject=None,
-              doppcorr='approx', SRF='ALMA'):
+    def model(self, datadict, pars, kwargs=None):
+
+        # Populate keywords from kwargs dictionary
+        kw = {} if kwargs is None else kwargs
+        if 'restfreq' not in kw:
+            kw['restfreq'] = 230.538e9
+        if 'FOV' not in kw:
+            kw['FOV'] = 5.0
+        if 'Npix' not in kw:
+            kw['Npix'] = 256
+        if 'dist' not in kw:
+            kw['dist'] = 150.
+        if 'chpad' not in kw:
+            kw['chpad'] = 3
+        if 'Nup' not in kw:
+            kw['Nup'] = None
+        if 'noise_inject' not in kw:
+            kw['noise_inject'] = None
+        if 'doppcorr' not in kw:
+            kw['doppcorr'] = 'approx'
+        if 'SRF' not in kw:
+            kw['SRF'] = 'ALMA'
 
         # Copy the input data format to a model
         modeldict = copy.deepcopy(datadict)
@@ -89,11 +107,15 @@ class simulate:
         EBlist = range(datadict['Nobs'])
         for EB in EBlist:
             modeldict[str(EB)] = self.modelset(datadict[str(EB)], pars,
-                                               restfreq=restfreq, FOV=FOV,
-                                               Npix=Npix, dist=dist,
-                                               chpad=chpad, Nup=Nup,
-                                               noise_inject=noise_inject,
-                                               doppcorr=doppcorr, SRF=SRF)
+                                               restfreq=kw['restfreq'], 
+                                               FOV=kw['FOV'], 
+                                               Npix=kw['Npix'], 
+                                               dist=kw['dist'], 
+                                               chpad=kw['chpad'], 
+                                               Nup=kw['Nup'],
+                                               noise_inject=kw['noise_inject'],
+                                               doppcorr=kw['doppcorr'], 
+                                               SRF=kw['SRF'])
 
         return modeldict
 

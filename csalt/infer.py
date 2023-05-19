@@ -184,10 +184,10 @@ class infer:
 
 
     """ Log-likelihood calculation """
-    def log_likelihood(self, theta, fdata=None):
+    def log_likelihood(self, theta, fdata=None, kwargs=None):
 
         # Compute model visibility spectra
-        fmodel = self.sim.model(fdata, theta, FOV=6.375, Npix=256, dist=150)
+        fmodel = self.sim.model(fdata, theta, kwargs=kwargs)
 
         # Loop over observations to get likelihood
         logL = 0

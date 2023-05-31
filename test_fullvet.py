@@ -17,11 +17,19 @@ do_inf = True
 data_name = 'vet_approxs.ms'
 
 if do_sim:
+<<<<<<< HEAD
 #    csim = create()
 #    cfg_dir = '/pool/asha0/casa-release-5.7.2-4.el7/data/alma/simmos/'
 #    cfg = [cfg_dir+'alma.cycle8.4.cfg', cfg_dir+'alma.cycle8.7.cfg']
 #    _ = csim.template_MS(cfg, ['10min', '40min'], 'simtests/multi.ms',
 #                         date=['2023/03/20', '2023/06/20'])
+=======
+    csim = create()
+    cfg_dir = ''
+    cfg = [cfg_dir+'alma.cycle8.4.cfg']#, cfg_dir+'alma.cycle8.7.cfg']
+    _ = csim.template_MS(cfg, ['10min'], 'simtests/single.ms',
+                         date=['2023/03/20'])#, '2023/06/20'])
+>>>>>>> 0cd3ae3fab9e409cb1fd97787b0c7c55526538fb
 
     sim = simulate('CSALT')
     data_dict = read_MS('simtests/single.ms')

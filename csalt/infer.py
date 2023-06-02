@@ -3,16 +3,20 @@ import sys
 import importlib
 import warnings
 import numpy as np
+from copy import deepcopy
 from scipy import linalg
 import scipy.constants as sc
 from csalt.data2 import *
 from csalt.simulate import *
+import emcee
+from multiprocessing import Pool
+os.environ["OMP_NUM_THREADS"] = "1"
 
 
 """
 The infer class for modeling visibility spectra.
 """
-class infer:
+class infer(object):
 
     def __init__(self, prescription, path=None, quiet=True):
 
@@ -189,6 +193,7 @@ class infer:
 
         # Compute model visibility spectra
         fmodel = self.sim.model(fdata, theta, kwargs=kwargs)
+        #fmodel = deepcopy(fdata)
 
         # Loop over observations to get likelihood
         logL = 0
@@ -219,17 +224,57 @@ class infer:
         return logL
 
 
+    """ Sample the posterior-space """
+    def sample_posteriors(self, data, kwargs=None, 
+                          Nwalk=75, Ninit=200, Nsteps=1000, 
+                          outpost='stdout.h5', append=False, Nthreads=6):
+
+        # Initialize parameters using random draws from the priors
+        Ndim = len(self.priors.pri_pars)
+        p0 = np.random.randn(Nwalk, Ndim)	#np.empty((Nwalk, Ndim))
+#        for ix in range(Ndim):
+#            if ix == 9:
+#                p0[:,ix] = np.sqrt(2 * sc.k * p0[:,6] / (28 * (sc.m_p+sc.m_e)))
+#            else:
+#                _ = [str(self.priors.pri_pars[ix][ip])+', ' 
+#                     for ip in range(len(self.priors.pri_pars[ix]))]
+#                cmd = 'np.random.'+self.priors.pri_types[ix]+ \
+#                      '('+"".join(_)+str(Nwalk)+')'
+#                p0[:,ix] = eval(cmd)
+
+        # Acquire the GCF and CORR caches to use in iterative sampling
+#        for i in range(data['Nobs']):
+#            _g, _c = self.sim.modelset(data[str(i)], p0[0], return_cache=True)
+#            data['gcf'+str(i)] = _g
+#            data['corr'+str(i)] = _c
+
+        # Declare data and kwargs as globals (for speed in emcee)
+#        fdata = deepcopy(data)
+#        kw = deepcopy(kwargs)
+
+        ### Initialize the MCMC walkers
+#        isamp = emcee.EnsembleSampler(Nwalk, Ndim, self.log_posterior)
+#        isamp.run_mcmc(p0, Ninit, progress=True)
+
+#        with Pool() as pool:
+#            isamp = emcee.EnsembleSampler(Nwalk, Ndim, self.log_posterior, 
+#                                          pool=pool)
+#            isamp.run_mcmc(p0, Ninit, progress=True)
+
+
     """ Log-posterior calculation """
-    def log_posterior(self, theta, fdata=None, kwargs=None):
+    def log_posterior(self, theta):     #, fdata=None, kwargs=None):
 
         # Calculate log-prior
-        lnT = np.sum(self.priors.logprior(theta)) * fdata['Nobs']
+#        priors = importlib.import_module('priors_CSALT')
+#        lnT = np.sum(priors.logprior(theta)) * 2	#fdata['Nobs']
+        lnT = 0
         if lnT == -np.inf:
             return -np.inf, -np.inf
 
         # Compute log-likelihood
-        lnL = self.log_likelihood(theta, fdata=fdata, kwargs=kwargs)
+        #lnL = self.log_likelihood(theta, fdata=fdata, kwargs=kwargs)
+        lnL = 0
 
         # return the log-posterior and the log-prior
         return lnL + lnT, lnT
-        

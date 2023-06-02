@@ -2,10 +2,13 @@ import os
 import sys
 import warnings
 import importlib
+import datetime
 import numpy as np
 import scipy.constants as sc
 from csalt.keplerian_mask import *
 from casatasks import tclean
+import casatools
+
 
 warnings.filterwarnings("ignore")
 
@@ -97,3 +100,74 @@ def imagecube(msfile, outfile,
     # Image
     kw['niter'] = niter_hold
     tclean(msfile, imagename=outfile, **kw)
+
+    return None
+
+
+
+def LST_to_UTC(date, LST, longitude):
+
+    # Load the measures and quanta tools
+    me = casatools.measures()
+    qa = casatools.quanta()
+
+    # Parse input LST into hours
+    h, m, s = LST.split(LST[2])
+    LST_hours = int(h) + int(m) / 60. + float(s) / 3600.
+
+    # Calculate the MJD
+    mjd = me.epoch('utc', date)['m0']['value']
+    jd = mjd + 2400000.5
+    T = (jd - 2451545.0) / 36525.0
+    sidereal = 280.46061837 + 360.98564736629 * (jd - 2451545.) \
+               + 0.000387933*T**2 - (1. / 38710000.)*T**3
+    sidereal += longitude
+    sidereal /= 360.
+    sidereal -= np.floor(sidereal)
+    sidereal *= 24.0
+    if (sidereal < 0): sidereal += 24
+    if (sidereal >= 24): sidereal -= 24
+    delay = (LST_hours - sidereal) / 24.0
+    if (delay < 0.0): delay += 1.0
+    mjd += delay / 1.002737909350795
+
+    # Convert to UTC date/time string
+    today = me.epoch('utc', 'today')
+    today['m0']['value'] = mjd
+    hhmmss = qa.time(today['m0'], form='', prec=6, showform=False)[0]
+    dt = qa.splitdate(today['m0'])
+    ut = '%s%s%02d%s%02d%s%s' % \
+         (dt['year'], '/', dt['month'], '/', dt['monthday'], '/', hhmmss)
+
+    return ut
+
+
+def doppler_set(nu_rest, vel_tune, datestring, RA, DEC,
+                equinox='J2000', observatory='ALMA'):
+
+    # Load the measures and quanta tools
+    me = casatools.measures()
+
+    # Set direction and epoch
+    position = me.direction(equinox, RA, DEC.replace(':', '.'))
+    obstime = me.epoch('utc', datestring)
+
+    # Define the radial velocity
+    rvel = me.radialvelocity('LSRK', str(vel_tune * 1e-3)+'km/s')
+
+    # Define the observing frame
+    me.doframe(position)
+    me.doframe(me.observatory(observatory))
+    me.doframe(obstime)
+    me.showframe()
+
+    # Convert to the TOPO frame
+    rvel_top = me.measure(rvel, 'TOPO')
+    dopp = me.todoppler('RADIO', rvel_top)
+    nu_top = me.tofrequency('TOPO', dopp,
+                            me.frequency('rest', str(nu_rest / 1e9)+'GHz'))
+
+    return nu_top['m0']['value']
+
+
+

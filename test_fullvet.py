@@ -2,13 +2,20 @@ import os, sys, importlib, time
 sys.path.append('configs/')
 import numpy as np
 from csalt.create import *
-from csalt.simulate import *
-from csalt.infer import *
+from csalt.cimulate import *
+from csalt.cinfer import *
 from csalt.utils2 import *
 from csalt.data2 import *
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 mpl.rcParams['backend'] = 'TkAgg'
+
+from csalt.stupid_test import *
+
+#stu = stupid_class()
+#_ = stu.fit_stuff(np.linspace(0, 1, 10))
+#sys.exit()
+
 
 # controls
 do_sim = False
@@ -17,19 +24,11 @@ do_inf = True
 data_name = 'vet_approxs.ms'
 
 if do_sim:
-<<<<<<< HEAD
-#    csim = create()
-#    cfg_dir = '/pool/asha0/casa-release-5.7.2-4.el7/data/alma/simmos/'
-#    cfg = [cfg_dir+'alma.cycle8.4.cfg', cfg_dir+'alma.cycle8.7.cfg']
-#    _ = csim.template_MS(cfg, ['10min', '40min'], 'simtests/multi.ms',
-#                         date=['2023/03/20', '2023/06/20'])
-=======
     csim = create()
     cfg_dir = ''
     cfg = [cfg_dir+'alma.cycle8.4.cfg']#, cfg_dir+'alma.cycle8.7.cfg']
     _ = csim.template_MS(cfg, ['10min'], 'simtests/single.ms',
                          date=['2023/03/20'])#, '2023/06/20'])
->>>>>>> 0cd3ae3fab9e409cb1fd97787b0c7c55526538fb
 
     sim = simulate('CSALT')
     data_dict = read_MS('simtests/single.ms')
@@ -40,17 +39,24 @@ if do_sim:
     write_MS(mdl_dict, outfile=data_name)
 
 if do_inf:
-    cinf = infer('CSALT')
+    cinf = cinfer('CSALT')
+
+#    global data_
     data_ = cinf.fitdata(data_name, vra=[-2000, 2200], chbin=1)
     inp = importlib.import_module('gen_fiducial_std')
     fixed_kw = {'FOV': inp.FOV[0], 'Npix': inp.Npix[0], 'dist': inp.dist,
                 'Nup': 1, 'doppcorr': 'approx'}
+    t0 = time.time()
     chi2 = -2 * cinf.log_likelihood(inp.pars, fdata=data_, kwargs=fixed_kw)
+    print(time.time()-t0)
     print(chi2)
+    sys.exit()
+#    print(chi2)
+#    lnprob, lnpri = cinf.log_posterior(inp.pars, fdata=data_, kwargs=fixed_kw)
+#    print(lnprob, lnpri)
 
 
-    lnprob, lnpri = cinf.log_posterior(inp.pars, fdata=data_, kwargs=fixed_kw)
-    print(lnprob, lnpri)
+    _ = cinf.sample_posteriors(data_, kwargs=fixed_kw, Nthreads=6)
 
 
 

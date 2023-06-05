@@ -37,13 +37,21 @@ clean_kw = {'start': '2km/s', 'width': '0.16km/s', 'nchan': 50}
 #              tclean_kwargs=clean_kw, mk_kepmask=True, kepmask_kwargs=mask_kw)
 
 
+# dummy cube
+
 # Calculate a single model likelihood (or chi2 value)
 fdata = cm.fitdata('vet_unified.ms', vra=[3000, 7000])
 t0 = time.time()
 chi2 = -2. * cm.log_likelihood(inp.pars, fdata=fdata, kwargs=fixed_kw)
 print(time.time()-t0)
 print(chi2)
-              
+
+print(inp.pars)
 
 
+# sample the posteriors!
+_ = cm.sample_posteriors('vet_unified.ms', vra=[3000, 7000], kwargs=fixed_kw,
+                         Nthreads=6, Ninits=3, Nsteps=3)
+
+# Sample the posteriors!
 

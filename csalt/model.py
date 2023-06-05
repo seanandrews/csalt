@@ -13,6 +13,7 @@ from scipy.ndimage import convolve1d
 from scipy.interpolate import interp1d
 from scipy import linalg
 from vis_sample import vis_sample
+from vis_sample.classes import SkyImage
 
 
 """
@@ -159,7 +160,8 @@ class model:
     """ Generate simulated dataset ('modelset') """
     def modelset(self, dset, pars,
                  restfreq=230.538e9, FOV=5.0, Npix=256, dist=150, chpad=3, 
-                 Nup=None, noise_inject=None, doppcorr='approx', SRF='ALMA'):
+                 Nup=None, noise_inject=None, doppcorr='approx', SRF='ALMA',
+                 gcf_holder=None, corr_cache=None, return_holders=False):
 
         """ Prepare the spectral grids: format = [timestamps, channels] """
         # Pad the LSRK frequencies
@@ -204,6 +206,7 @@ class model:
                 # sample the FFT on the (u, v) spacings
                 mvis = vis_sample(imagefile=icube, 
                                   uu=dset.ulam[ixl:ixh], vv=dset.vlam[ixl:ixh],
+                                  gcf_holder=gcf_holder, corr_cache=corr_cache,
                                   mu_RA=pars[-2], mu_DEC=pars[-1], 
                                   mod_interp=False).T
 
@@ -222,9 +225,19 @@ class model:
                               FOV=FOV, Npix=Npix, dist=dist)
 
             # sample the FFT on the (u, v) spacings
-            mvis = vis_sample(imagefile=icube, uu=dset.ulam, vv=dset.vlam, 
-                              mu_RA=pars[-2], mu_DEC=pars[-1], 
-                              mod_interp=False).T
+            if return_holders:
+                mvis, gcf, corr = vis_sample(imagefile=icube, 
+                                             uu=dset.ulam, vv=dset.vlam,
+                                             mu_RA=pars[-2], mu_DEC=pars[-1],
+                                             return_gcf=True, 
+                                             return_corr_cache=True,
+                                             mod_interp=False)
+                return mvis.T, gcf, corr
+            else:
+                mvis = vis_sample(imagefile=icube, uu=dset.ulam, vv=dset.vlam, 
+                                  gcf_holder=gcf_holder, corr_cache=corr_cache,
+                                  mu_RA=pars[-2], mu_DEC=pars[-1], 
+                                  mod_interp=False).T
 
             # distribute to different timestamps by interpolation
             for itime in range(dset.nstamps):
@@ -398,7 +411,7 @@ class model:
         Function to parse and package visibility data for inference
     """
     def fitdata(self, msfile,
-                vra=None, vcensor=None, nu_rest=230.538e9, chbin=1,
+                vra=None, vcensor=None, nu_rest=230.538e9, chbin=1, 
                 well_cond=300):
 
         # Load the data from the MS file into a dictionary
@@ -550,9 +563,126 @@ class model:
             # Package additional information into the dictionary
             out_dict['invcov_'+str(i)] = scov_inv
             out_dict['lnL0_'+str(i)] = lnL0
+            out_dict['gcf_'+str(i)] = None
+            out_dict['corr_'+str(i)] = None
 
         # Return the output dictionary
         return out_dict
+
+
+    """
+        Sample the posteriors.
+    """
+    def sample_posteriors(self, msfile, vra=None, vcensor=None, kwargs=None,
+                          nu_rest=230.538e9, chbin=1, well_cond=300,
+                          Nwalk=75, Ninits=20, Nsteps=1000, 
+                          outpost='stdout.h5', append=False, Nthreads=6):
+
+        import emcee
+        from multiprocessing import Pool
+        if Nthreads > 1:
+            os.environ["OMP_NUM_THREADS"] = "1"
+
+        # Parse the data into proper format
+        infdata = self.fitdata(msfile, vra=vra, vcensor=vcensor, 
+                               nu_rest=nu_rest, chbin=chbin, 
+                               well_cond=well_cond)
+
+        # Initialize the parameters using random draws from the priors
+        priors = importlib.import_module('priors_'+self.prescription)
+        Ndim = len(priors.pri_pars)
+        p0 = np.empty((Nwalk, Ndim))
+        for ix in range(Ndim):
+            if ix == 9:
+                p0[:,ix] = np.sqrt(2 * sc.k * p0[:,6] / (28 * (sc.m_p+sc.m_e)))
+            else:
+                _ = [str(priors.pri_pars[ix][ip])+', '
+                     for ip in range(len(priors.pri_pars[ix]))]
+                cmd = 'np.random.'+priors.pri_types[ix]+ \
+                      '('+"".join(_)+str(Nwalk)+')'
+                p0[:,ix] = eval(cmd)
+
+        # Acquire and store the GCF and CORR caches for iterative sampling
+        for i in range(infdata['Nobs']):
+            _, gcf, corr = self.modelset(infdata[str(i)], p0[0], 
+                                         restfreq=nu_rest, 
+                                         FOV=kwargs['FOV'],
+                                         Npix=kwargs['Npix'], 
+                                         dist=kwargs['dist'],
+                                         return_holders=True)
+            infdata['gcf_'+str(i)] = gcf
+            infdata['corr_'+str(i)] = corr
+
+        # Declare the data and kwargs as globals (for speed in pickling)
+        global fdata
+        global kw
+        fdata = copy.deepcopy(infdata)
+        kw = copy.deepcopy(kwargs)
+
+        if not append:
+
+            # Initialize the MCMC walkers
+            with Pool(processes=Nthreads) as pool:
+                isamp = emcee.EnsembleSampler(Nwalk, Ndim, self.log_posterior,
+                                              pool=pool)
+                isamp.run_mcmc(p0, Ninits, progress=True)
+            isamples = isamp.get_chain()   # [Ninits, Nwalk, Ndim]-shaped
+            lop0 = np.quantile(isamples[-1, :, :], 0.25, axis=0)
+            hip0 = np.quantile(isamples[-1, :, :], 0.75, axis=0)
+            p00 = [np.random.uniform(lop0, hip0, Ndim) for iw in range(Nwalk)]
+
+            # Prepare the backend
+            os.system('rm -rf '+outpost)
+            backend = emcee.backends.HDFBackend(outpost)
+            backend.reset(Nwalk, Ndim)
+
+            # Sample the posterior distribution
+            with Pool(processes=Nthreads) as pool:
+                samp = emcee.EnsembleSampler(Nwalk, Ndim, self.log_posterior,
+                                             pool=pool, backend=backend)
+                t0 = time.time()
+                samp.run_mcmc(p00, Nsteps, progress=True)
+            t1 = time.time()
+            print('backend run in ', t1-t0)
+
+        else:
+ 
+            # Load the old backend
+            new_backend = emcee.backends.HDFBackend(outpost)
+            
+            # Continue sampling the posterior distribution
+            with Pool(processes=Nthreads) as pool:
+                samp = emcee.EnsembleSampler(Nwalk, Ndim, self.log_posterior,
+                                             pool=pool, backend=new_backend)
+                t0 = time.time()
+                samp.run_mcmc(None, Nsteps, progress=True)
+            t1 = time.time()
+
+        print('\n\n    This run took %.2f hours' % ((t1 - t0) / 3600))
+
+        # Release the globals
+        del fdata
+        del kw
+
+        return None
+
+
+    """
+        Function to calculate a log-posterior sample.
+    """
+    def log_posterior(self, theta):
+
+        # Calculate log-prior
+        priors = importlib.import_module('priors_'+self.prescription)
+        lnT = np.sum(priors.logprior(theta)) * fdata['Nobs']
+        if lnT == -np.inf:
+            return -np.inf, -np.inf
+
+        # Compute log-likelihood
+        lnL = self.log_likelihood(theta, fdata=fdata, kwargs=kw)
+
+        # return the log-posterior and the log-prior
+        return lnL + lnT, lnT
 
 
     """
@@ -560,17 +690,21 @@ class model:
     """
     def log_likelihood(self, theta, fdata=None, kwargs=None):
 
-        # Compute model visibility spectra
-        t0 = time.time()
-        fmodel = self.modeldict(fdata, theta, kwargs=kwargs)
-        t1 = time.time()
-
         # Loop over observations to get likelihood
         logL = 0
         for i in range(fdata['Nobs']):
 
-            # Get the data and model visibility spectra
-            _data, _mdl = fdata[str(i)], fmodel[str(i)]
+            # Get the data 
+            _data = fdata[str(i)]
+
+            # Calculate the model
+            _mdl = self.modelset(_data, theta, restfreq=kwargs['restfreq'],
+                                 FOV=kwargs['FOV'], Npix=kwargs['Npix'], 
+                                 dist=kwargs['dist'], chpad=kwargs['chpad'],
+                                 doppcorr=kwargs['doppcorr'], 
+                                 SRF=kwargs['SRF'], 
+                                 gcf_holder=fdata['gcf_'+str(i)],
+                                 corr_cache=fdata['corr_'+str(i)])
 
             # Spectrally bin the model visibilities if necessary
             # **technically wrong, since the weights are copied like this; 
@@ -591,10 +725,6 @@ class model:
             Cinv = fdata['invcov_'+str(i)]
             logL += -0.5 * np.tensordot(resid, np.dot(Cinv, var * resid))
 
-        t2 = time.time()
-        print(t1-t0)
-        print(t2-t1)
-        print(' ')
         return logL
 
     """

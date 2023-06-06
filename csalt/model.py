@@ -415,7 +415,7 @@ class model:
                 well_cond=300):
 
         # Load the data from the MS file into a dictionary
-        data_dict = self.read_MS(msfile)
+        data_dict = read_MS(msfile)
 
         # If chbin is a scalar, distribute it over the Nobs executions
         if np.isscalar(chbin):

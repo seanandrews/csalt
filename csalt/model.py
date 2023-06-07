@@ -127,7 +127,7 @@ class model:
         if 'dist' not in kw:
             kw['dist'] = 150.
         if 'chpad' not in kw:
-            kw['chpad'] = 3
+            kw['chpad'] = 2
         if 'Nup' not in kw:
             kw['Nup'] = None
         if 'noise_inject' not in kw:
@@ -137,29 +137,44 @@ class model:
         if 'SRF' not in kw:
             kw['SRF'] = 'ALMA'
 
-        # Copy the input data format to a model
-        mdict = copy.deepcopy(ddict)
-
-        # Loop over constituent observations to calculate modelsets
+        # List of input EBs
         EBlist = range(ddict['Nobs'])
-        for EB in EBlist:
-            mdict[str(EB)] = self.modelset(ddict[str(EB)], pars,
-                                           restfreq=kw['restfreq'], 
-                                           FOV=kw['FOV'], 
-                                           Npix=kw['Npix'], 
-                                           dist=kw['dist'], 
-                                           chpad=kw['chpad'], 
-                                           Nup=kw['Nup'],
-                                           noise_inject=kw['noise_inject'],
-                                           doppcorr=kw['doppcorr'], 
-                                           SRF=kw['SRF'])
 
-        return mdict
+        # Copy the input data format to a model
+        if kw['noise_inject'] is None:
+            m_ = copy.deepcopy(ddict)
+            for EB in EBlist:
+                m_[str(EB)] = self.modelset(ddict[str(EB)], pars,
+                                               restfreq=kw['restfreq'], 
+                                               FOV=kw['FOV'], 
+                                               Npix=kw['Npix'], 
+                                               dist=kw['dist'], 
+                                               chpad=kw['chpad'], 
+                                               Nup=kw['Nup'],
+                                               noise_inject=kw['noise_inject'],
+                                               doppcorr=kw['doppcorr'], 
+                                               SRF=kw['SRF'])
+            return m_
+        else:
+            p_, n_ = copy.deepcopy(ddict), copy.deepcopy(ddict)
+            for EB in EBlist:
+                p_[str(EB)], n_[str(EB)] = self.modelset(ddict[str(EB)], pars,
+                                                restfreq=kw['restfreq'],
+                                                FOV=kw['FOV'],
+                                                Npix=kw['Npix'],
+                                                dist=kw['dist'],
+                                                chpad=kw['chpad'],
+                                                Nup=kw['Nup'],
+                                                noise_inject=kw['noise_inject'],
+                                                doppcorr=kw['doppcorr'],
+                                                SRF=kw['SRF'])
+            return p_, n_
+
 
 
     """ Generate simulated dataset ('modelset') """
     def modelset(self, dset, pars,
-                 restfreq=230.538e9, FOV=5.0, Npix=256, dist=150, chpad=3, 
+                 restfreq=230.538e9, FOV=5.0, Npix=256, dist=150, chpad=2, 
                  Nup=None, noise_inject=None, doppcorr='approx', SRF='ALMA',
                  gcf_holder=None, corr_cache=None, return_holders=False):
 
@@ -258,8 +273,17 @@ class model:
         else:
             mvis_pure = 1. * mvis_
 
-        # Noise injection (if desired)
-        if noise_inject is not None:
+        # Decimate and package the pure visibility spectra
+        mvis_pure = mvis_pure[:,::Nup,:,:]
+        mvis_pure = mvis_pure[:,chpad:-chpad,:,:]
+        mvis_p = mvis_pure[:,:,:,0] + 1j * mvis_pure[:,:,:,1]
+        mset_p = dataset(dset.um, dset.vm, mvis_p, dset.wgt, dset.nu_TOPO,
+                         dset.nu_LSRK, dset.tstamp)
+
+        # Return the pure or pure and noisy models
+        if noise_inject is None:
+            return mset_p
+        else:
             # Scale input RMS for desired noise per vis-chan-pol
             sigma_out = 1e-3 * noise_inject * np.sqrt(dset.npol * dset.nvis)
 
@@ -271,23 +295,30 @@ class model:
                                      (dset.npol, nch, dset.nvis, 2))
             noise = np.squeeze(noise)
 
-        # Decimate, strip pads, and return a model dataset
-        if noise_inject is None:
-            mvis_pure = mvis_pure[:,::Nup,:,:]
-            mvis_pure = mvis_pure[:,chpad:-chpad,:,:]
-            mvis_p = mvis_pure[:,:,:,0] + 1j * mvis_pure[:,:,:,1]
-            mset = dataset(dset.um, dset.vm, mvis_p, dset.wgt, dset.nu_TOPO,
-                           dset.nu_LSRK, dset.tstamp)
-            return mset
+            # SRF convolution of noisy data
+            if SRF is not None:
+                mvis_noisy = convolve1d(mvis_ + noise, kernel, axis=1, 
+                                        mode='nearest')
+            else:
+                mvis_noisy = mvis_ + noise
+
+            # Decimate and package the pure visibility spectra
+            mvis_noisy = mvis_noisy[:,::Nup,:,:]
+            mvis_noisy = mvis_noisy[:,chpad:-chpad,:,:]
+            mvis_n = mvis_noisy[:,:,:,0] + 1j * mvis_noisy[:,:,:,1]
+            mset_n = dataset(dset.um, dset.vm, mvis_n, dset.wgt, dset.nu_TOPO,
+                             dset.nu_LSRK, dset.tstamp)
+
+            return mset_p, mset_n
 
 
     """
         Create a blank MS template 
     """
-    def template_MS(self, config, t_total, msfile, sim_save=False,
-                    RA='16:00:00.00', DEC='-30:00:00.00', nu_rest=230.538e9,
-                    dnu_native=122e3, V_span=10e3, V_tune=0.0e3,
-                    t_integ='6s', HA_0='0h', date='2023/03/20',
+    def template_MS(self, msfile, config='', t_total='1min', 
+                    sim_save=False, RA='16:00:00.00', DEC='-30:00:00.00', 
+                    nu_rest=230.538e9, dnu_native=122e3, V_span=10e3, 
+                    V_tune=0.0e3, t_integ='6s', HA_0='0h', date='2023/03/20',
                     observatory='ALMA'):
 
         # Load the measures tools

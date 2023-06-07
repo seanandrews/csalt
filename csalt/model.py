@@ -317,7 +317,7 @@ class model:
     """
     def template_MS(self, msfile, config='', t_total='1min', 
                     sim_save=False, RA='16:00:00.00', DEC='-30:00:00.00', 
-                    nu_rest=230.538e9, dnu_native=122e3, V_span=10e3, 
+                    restfreq=230.538e9, dnu_native=122e3, V_span=10e3, 
                     V_tune=0.0e3, t_integ='6s', HA_0='0h', date='2023/03/20',
                     observatory='ALMA'):
 
@@ -355,7 +355,7 @@ class model:
         for i in range(Nobs):
 
             # Calculate the number of native channels
-            nch = 2 * int(V_span[i] / (sc.c * dnu_native[i] / nu_rest)) + 1
+            nch = 2 * int(V_span[i] / (sc.c * dnu_native[i] / restfreq)) + 1
 
             # Calculate the LST starting time of the execution block
             h, m, s = RA.split(':')
@@ -370,7 +370,7 @@ class model:
             UT_0 = LST_to_UTC(date[i], LST_0, obs_long)
 
             # Calculate the TOPO tuning frequency
-            nu_tune_0 = doppler_set(nu_rest, V_tune[i], UT_0, RA, DEC,
+            nu_tune_0 = doppler_set(restfreq, V_tune[i], UT_0, RA, DEC,
                                     observatory=observatory)
 
             # Generate a dummy (empty) cube
@@ -442,7 +442,7 @@ class model:
         Function to parse and package visibility data for inference
     """
     def fitdata(self, msfile,
-                vra=None, vcensor=None, nu_rest=230.538e9, chbin=1, 
+                vra=None, vcensor=None, restfreq=230.538e9, chbin=1, 
                 well_cond=300):
 
         # Load the data from the MS file into a dictionary
@@ -454,6 +454,10 @@ class model:
         else:
             if isinstance(chbin, list):
                 chbin = np.asarray(chbin)
+
+        # If vra is a list, make it an array
+        if isinstance(vra, list):
+            vra = np.asarray(vra)
 
         # Assign an output dictionary
         out_dict = {'Nobs': data_dict['Nobs'], 'chbin': chbin}
@@ -475,10 +479,10 @@ class model:
                 data.wgt = np.rollaxis(data.wgt, 1, 0)
 
             # Convert the LSRK frequency grid to velocities
-            v_LSRK = sc.c * (1 - data.nu_LSRK / nu_rest)
+            v_LSRK = sc.c * (1 - data.nu_LSRK / restfreq)
 
             # Fix direction of desired velocity bounds
-            if vra is None: vra = [-1e5, 1e5]
+            if vra is None: vra = np.array([-1e5, 1e5])
             dv, dvra = np.diff(v_LSRK, axis=1), np.diff(vra)
             if np.logical_or(np.logical_and(np.all(dv < 0), np.all(dvra > 0)),
                              np.logical_and(np.all(dv < 0), np.all(dvra < 0))):
@@ -605,7 +609,7 @@ class model:
         Sample the posteriors.
     """
     def sample_posteriors(self, msfile, vra=None, vcensor=None, kwargs=None,
-                          nu_rest=230.538e9, chbin=1, well_cond=300,
+                          restfreq=230.538e9, chbin=1, well_cond=300,
                           Nwalk=75, Ninits=20, Nsteps=1000, 
                           outpost='stdout.h5', append=False, Nthreads=6):
 
@@ -616,7 +620,7 @@ class model:
 
         # Parse the data into proper format
         infdata = self.fitdata(msfile, vra=vra, vcensor=vcensor, 
-                               nu_rest=nu_rest, chbin=chbin, 
+                               restfreq=restfreq, chbin=chbin, 
                                well_cond=well_cond)
 
         # Initialize the parameters using random draws from the priors
@@ -636,7 +640,7 @@ class model:
         # Acquire and store the GCF and CORR caches for iterative sampling
         for i in range(infdata['Nobs']):
             _, gcf, corr = self.modelset(infdata[str(i)], p0[0], 
-                                         restfreq=nu_rest, 
+                                         restfreq=restfreq, 
                                          FOV=kwargs['FOV'],
                                          Npix=kwargs['Npix'], 
                                          dist=kwargs['dist'],
@@ -650,8 +654,27 @@ class model:
         fdata = copy.deepcopy(infdata)
         kw = copy.deepcopy(kwargs)
 
-        if not append:
+        # Populate keywords from kwargs dictionary
+        if 'restfreq' not in kw:
+            kw['restfreq'] = restfreq
+        if 'FOV' not in kw:
+            kw['FOV'] = 5.0
+        if 'Npix' not in kw:
+            kw['Npix'] = 256
+        if 'dist' not in kw:
+            kw['dist'] = 150.
+        if 'chpad' not in kw:
+            kw['chpad'] = 2
+        if 'Nup' not in kw:
+            kw['Nup'] = None
+        if 'noise_inject' not in kw:
+            kw['noise_inject'] = None
+        if 'doppcorr' not in kw:
+            kw['doppcorr'] = 'approx'
+        if 'SRF' not in kw:
+            kw['SRF'] = 'ALMA'
 
+        if not append:
             # Initialize the MCMC walkers
             with Pool(processes=Nthreads) as pool:
                 isamp = emcee.EnsembleSampler(Nwalk, Ndim, self.log_posterior,
@@ -677,7 +700,6 @@ class model:
             print('backend run in ', t1-t0)
 
         else:
- 
             # Load the old backend
             new_backend = emcee.backends.HDFBackend(outpost)
             
@@ -695,7 +717,7 @@ class model:
         del fdata
         del kw
 
-        return None
+        return samp
 
 
     """

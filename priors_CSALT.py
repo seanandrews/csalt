@@ -6,9 +6,9 @@ import scipy.constants as sc
 pri_types = [ 'normal',  'normal', 'uniform',  'normal', 'uniform',
               'normal', 'uniform',  'normal', 'uniform', 'linewidth',
              'uniform', 'uniform',  'normal',  'normal',  'normal']
-pri_pars = [ [40, 2], [130, 2], [0.5, 1.5], [250, 50], [0.0, 0.5],
-             [1.25, 0.5], [50, 300], [-0.5, 0.2], [5, 100], [1000],
-             [1.0, 4.0], [-2, 0], [5e3, 2.5e2], [0.0, 0.05], [0.0, 0.05] ]
+pri_pars = [ [33, 2], [150, 2], [0.7, 1.5], [150, 50], [0.0, 0.5],
+             [1.25, 0.5], [50, 150], [-0.5, 0.2], [5, 100], [1000],
+             [1.0, 4.0], [-2, 0], [4.1e3, 1e2], [0.0, 0.05], [0.0, 0.05] ]
 
 
 ### Pre-defined standard functions

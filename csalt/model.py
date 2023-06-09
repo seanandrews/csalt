@@ -54,8 +54,9 @@ class model:
         if quiet:
             warnings.filterwarnings("ignore")
 
+        if np.logical_or((path != os.getcwd()), (path is not None)):
+            sys.path.append(path)
         self.prescription = prescription
-        self.path = path
 
 
     """ 
@@ -69,19 +70,11 @@ class model:
             velax = np.array(velax)
         fixed = restfreq, FOV, Npix, dist, {}
 
-        # Locate the prescription file
-        if self.path is not None:
-            if self.path[-1] != '/':
-                pfile = self.path+'/parametric_disk_'+self.prescription
-            else:
-                pfile = self.path+'parametric_disk_'+self.prescription
-        else: 
-            pfile = 'parametric_disk_'+self.prescription
+        # Load the appropriate prescription
+        pfile = 'parametric_disk_'+self.prescription
         if not os.path.exists(pfile+'.py'):
             print('The prescription '+pfile+'.py does not exist.  Exiting.')
             sys.exit()
-
-        # Load the appropriate precription
         pd = importlib.import_module(pfile)
 
         # Calculate the emission cube

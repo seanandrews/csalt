@@ -15,7 +15,7 @@ cm.template_MS('testdata/test.ms',
                config=[cdir+'alma.cycle8.5.cfg', cdir+'alma.cycle8.8.cfg'],
                t_total=['2min', '7min'], t_integ='30s', observatory='ALMA',
                date=['2023/04/20', '2023/07/20'], HA_0=['0h', '1h'],
-               nu_rest=230.538e9, dnu_native=[122e3, 122e3],
+               restfreq=230.538e9, dnu_native=[122e3, 122e3],
                RA='16:00:00.00', DEC='-30:00:00.00')
 
 # Get the data dictionary from the empty MS
@@ -23,10 +23,10 @@ ddict = read_MS('testdata/test.ms')
 
 # Define some fixed attributes for the model
 fixed_kw = {'FOV': 5.11, 'Npix': 512, 'dist': 161,
-            'Nup': 5, 'doppcorr': 'exact', 'noise_inject': 5.0}
+            'Nup': 5, 'doppcorr': 'exact', 'noise_inject': 0.005}
 
 # Set the CSALT model parameters
-pars = np.array([-33, 150, 1.1, 120, 0.3, 1.5, 120, -0.5, 20., 217,
+pars = np.array([-33, 90, 1.1, 120, 0.3, 1.5, 120, -0.5, 20., 217,
                  2.2, -1, 4100, 0, 0])
 
 # Calculate a model dictionary; insert it to model MS files

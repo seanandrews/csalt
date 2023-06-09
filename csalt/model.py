@@ -92,26 +92,42 @@ class model:
         Spectral Response Functions (SRF) 
     """
     def SRF_kernel(self, srf_type, Nup=1):
-        
-        # The ALMA baseline correlator 
-        if srf_type == 'ALMA':
-            if Nup > 1:
-                chix = np.arange(25 * Nup) / Nup
-                xch = chix - np.mean(chix)
-                srf_ = 0.5 * np.sinc(xch) + \
-                       0.25 * np.sinc(xch - 1) + 0.25 * np.sinc(xch + 1)
+        # Full-resolution cases for up-sampled spectra
+        if Nup > 1:
+            chix = np.arange(25 * Nup) / Nup
+            xch = chix - np.mean(chix)
+            
+            # (F)XF correlators
+            if srf_type in ['ALMA', 'VLA']:
+                srf = 0.5 * np.sinc(xch) + \
+                      0.25 * (np.sinc(xch - 1) + np.sinc(xch + 1))
+            # FX correlators
+            elif srf_type in ['SMA', 'NOEMA']:
+                srf = (np.sinc(xch))**2
+            # ALMA-WSU
+            elif srf_type in ['ALMA-WSU']:
+                _wsu = np.load('csalt/data/WSU_SRF.npz')
+                wint = interp1d(_wsu['chix'], _wsu['srf'], 
+                                fill_value='extrapolate', kind='cubic')
+                srf = wint(xch)
+            # break
             else:
-                srf_ = np.array([0.00, 0.25, 0.50, 0.25, 0.00])
+                print('I do not know that SRF type.  Exiting.')
+                sys.exit()
 
-        # The ALMA WSU correlator
-        elif srf_type == 'ALMA-WSU':
-            sdat = np.load('WSU_SRF.npz')
+            return srf / np.trapz(srf, xch)
 
+        # Approximations for sampled-in-place spectra
         else:
-            print('Which SRF?')
-        
-        return srf_ / np.sum(srf_)
+            # (F)XF correlators
+            if srf_type in ['ALMA', 'VLA']:
+                srf = np.array([0.00, 0.25, 0.50, 0.25, 0.00])
+            # others
+            else:
+                srf = np.array([0.00, 0.00, 1.00, 0.00, 0.00])
 
+            return srf
+        
 
     """ Generate simulated data ('modeldict') """
     def modeldict(self, ddict, pars, kwargs=None):
@@ -231,7 +247,7 @@ class model:
                 mvis_[0,:,ixl:ixh,1] = mvis.imag
                 mvis_[1,:,ixl:ixh,1] = mvis.imag
 
-        else:
+        elif doppcorr == 'approx':
             # velocities at the mid-point timestamp of this EB
             v_model = vel[int(np.round(nu.shape[0] / 2)),:]
 
@@ -265,6 +281,28 @@ class model:
                 mvis_[1,:,ixl:ixh,0] = interp_vis.real
                 mvis_[0,:,ixl:ixh,1] = interp_vis.imag
                 mvis_[1,:,ixl:ixh,1] = interp_vis.imag
+        elif doppcorr is None:
+            # make a cube
+            icube = self.cube(vel[0,:], pars, restfreq=restfreq,
+                              FOV=FOV, Npix=Npix, dist=dist)
+
+            # sample the FFT on the (u, v) spacings
+            if return_holders:
+                mvis, gcf, corr = vis_sample(imagefile=icube, 
+                                             uu=dset.ulam, vv=dset.vlam,
+                                             mu_RA=pars[-2], mu_DEC=pars[-1],
+                                             return_gcf=True,
+                                             return_corr_cache=True,
+                                             mod_interp=False)
+                return mvis.T, gcf, corr
+            else:
+                mvis = vis_sample(imagefile=icube, uu=dset.ulam, vv=dset.vlam,
+                                  gcf_holder=gcf_holder, corr_cache=corr_cache,
+                                  mu_RA=pars[-2], mu_DEC=pars[-1],
+                                  mod_interp=False).T
+        else:
+            print('You need to specify a doppcorr method.  Exiting.')
+            sys.exit()
 
         # Convolve with the spectral response function (SRF)
         if SRF is not None:
@@ -284,16 +322,9 @@ class model:
         if noise_inject is None:
             return mset_p
         else:
-            # Scale input RMS for desired noise per vis-chan-pol
-            sigma_out = 1e-3 * noise_inject * np.sqrt(dset.npol * dset.nvis)
-
-            # Scale to account for spectral oversampling and SRF
-            sigma_noise = sigma_out * np.sqrt(Nup * 8./3.)
-
-            # Random Gaussian noise draws
-            noise = np.random.normal(0, sigma_noise,
-                                     (dset.npol, nch, dset.nvis, 2))
-            noise = np.squeeze(noise)
+            # Calculate noise spectra
+            noise = self.calc_noise(noise_inject, dset, 
+                                    nchan=nch, Nup=Nup, SRF=SRF)
 
             # SRF convolution of noisy data
             if SRF is not None:
@@ -313,13 +344,33 @@ class model:
 
 
     """
+        A noise calculator
+    """
+    def calc_noise(self, noise_inject, dataset, nchan=1, Nup=None, SRF='ALMA'):
+
+        # Scale input RMS for desired noise per vis-chan-pol
+        sigma_out = noise_inject * np.sqrt(dataset.npol * dataset.nvis)
+
+        # Scale to account for spectral oversampling and SRF
+        if Nup is None: Nup = 1
+        sigma_noise = sigma_out * np.sqrt(Nup * 8./3.)
+
+        # Random Gaussian noise draws
+        noise = np.random.normal(0, sigma_noise,
+                                 (dataset.npol, nchan, dataset.nvis, 2))
+        
+        return np.squeeze(noise)
+
+
+
+    """
         Create a blank MS template 
     """
     def template_MS(self, msfile, config='', t_total='1min', 
                     sim_save=False, RA='16:00:00.00', DEC='-30:00:00.00', 
                     restfreq=230.538e9, dnu_native=122e3, V_span=10e3, 
                     V_tune=0.0e3, t_integ='6s', HA_0='0h', date='2023/03/20',
-                    observatory='ALMA'):
+                    observatory='ALMA', force_to_LSRK=False):
 
         # Load the measures tools
         me = casatools.measures()
@@ -779,105 +830,3 @@ class model:
             logL += -0.5 * np.tensordot(resid, np.dot(Cinv, var * resid))
 
         return logL
-
-    """
-        Function to read contents of MS file into a data dictionary.
-    """
-    def read_MS(self, msfile):
-
-        # Make sure the file exists
-        if not os.path.exists(msfile):
-            print('I cannot find '+msfile+'.  Exiting.')
-            sys.exit()
-
-        # Ingest the SPW information into a dictionary
-        ms = casatools.ms()
-        ms.open(msfile)
-        spw_dict = ms.getspectralwindowinfo()
-        ms.close()
-
-        # Identify the number of distinct execution blocks
-        Nobs = len(spw_dict)
-
-        # Initialize a data dictionary
-        data_dict = {'Nobs': Nobs, 'input_file': msfile}
-
-        # Loop over executions to load dataset objects into the data dictionary
-        for EB in range(Nobs):
-            # Compute the TOPO frequencies
-            spw = spw_dict[str(EB)]
-            nu = spw['Chan1Freq'] + spw['ChanWidth'] * np.arange(spw['NumChan'])
-
-            # Open the MS file for this EB
-            ms.open(msfile)
-            ms.selectinit(datadescid=EB)
-
-            # Load the data into a dictionary
-            d = ms.getdata(['data', 'weight', 'u', 'v', 'time'])
-
-            # Identify the unique timestamps
-            tstamps = np.unique(d['time'])
-
-            # Allocate the timestamp index and LSRK frequency grids
-            tstamp_ID = np.empty_like(d['time'])
-            nu_ = np.empty((len(tstamps), len(nu)))
-
-            # Loop over timestamps to populate index and LSRK frequency grids
-            for istamp in range(len(tstamps)):
-                tstamp_ID[d['time'] == tstamps[istamp]] = istamp
-                nu_[istamp,:] = ms.cvelfreqs(spwids=[EB],
-                                             mode='channel', 
-                                             outframe='LSRK',
-                                             obstime=str(tstamps[istamp])+'s')
-
-            # Close the MS file
-            ms.close()
-
-            # Append a dataset object to the data dictionary
-            data_dict[str(EB)] = dataset(d['u'], 
-                                         d['v'], 
-                                         d['data'], 
-                                         d['weight'],
-                                         nu, 
-                                         nu_,
-                                         tstamp_ID)
-
-        return data_dict
-
-
-
-    """
-    Function to write contents of a data dictionary to MS file 
-    """
-    def write_MS(self, data_dict, outfile='out.ms', resid=False):
-
-        # Copy the input MS file to the output file
-        if not os.path.exists(data_dict['input_file']):
-            print('I cannot find the input MS file '+data_dict['input_file']+\
-                  ' to make a copy.  Exiting.')
-            sys.exit()
-        else:
-            os.system('rm -rf '+outfile)
-            os.system('cp -r '+data_dict['input_file']+' '+outfile)
-
-        # Loop over the observations to pack into the MS file
-        ms = casatools.ms()
-        for EB in range(data_dict['Nobs']):
-            # open the MS file for this EB
-            ms.open(outfile, nomodify=False)
-            ms.selectinit(datadescid=EB)
-
-            # pull the data array
-            d = ms.getdata(['data'])
-
-            # replace with the model array or the residuals
-            if resid:
-                d['data'] -= data_dict[str(EB)].vis
-            else:
-                d['data'] = data_dict[str(EB)].vis
-            ms.putdata(d)
-
-            # close the MS file
-            ms.close()
-
-        return None

@@ -351,9 +351,13 @@ class model:
         # Scale input RMS for desired noise per vis-chan-pol
         sigma_out = noise_inject * np.sqrt(dataset.npol * dataset.nvis)
 
-        # Scale to account for spectral oversampling and SRF
+        # Scale to account for spectral up-sampling and SRF (TEMPORARY)
         if Nup is None: Nup = 1
-        sigma_noise = sigma_out * np.sqrt(Nup * 8./3.)
+        if SRF in ['ALMA', 'VLA']:
+            fcov = 8./3.
+        else:
+            fcov = 1.
+        sigma_noise = sigma_out * np.sqrt(Nup * fcov)
 
         # Random Gaussian noise draws
         noise = np.random.normal(0, sigma_noise,

@@ -5,6 +5,7 @@ import importlib
 import datetime
 import numpy as np
 import scipy.constants as sc
+from astropy.io import fits
 from csalt.keplerian_mask import *
 from casatasks import tclean
 import casatools
@@ -300,4 +301,62 @@ def doppler_set(nu_rest, vel_tune, datestring, RA, DEC,
     return nu_top['m0']['value']
 
 
+def cube_to_fits(sky_image, fitsout, RA=0., DEC=0., restfreq=230.538e9):
 
+    # revert to proper formatting
+    cube = np.rollaxis(np.fliplr(sky_image.data), -1)
+
+    # extract coordinate information
+    im_nfreq, im_ny, im_nx = cube.shape
+    pixsize_x = np.abs(np.diff(sky_image.ra)[0])
+    pixsize_y = np.abs(np.diff(sky_image.dec)[0])
+    CRVAL3 = sky_image.freqs[0]
+    if len(sky_image.freqs) > 1:
+        CDELT3 = np.diff(sky_image.freqs)[0]
+    else:
+        CDELT3 = 1
+
+    # generate the primary HDU
+    hdu = fits.PrimaryHDU(np.float32(cube))
+
+    # generate the header
+    header = hdu.header
+    header['EPOCH'] = 2000.
+    header['EQUINOX'] = 2000.
+
+    # Latitude and Longitude of the pole of the coordinate system.
+    header['LATPOLE'] = -1.436915713634E+01
+    header['LONPOLE'] = 180.
+
+    # Define the RA coordinate
+    header['CTYPE1'] = 'RA---SIN'
+    header['CUNIT1'] = 'DEG'
+    header['CDELT1'] = -pixsize_x / 3600
+    header['CRPIX1'] = 0.5 * im_nx + 0.5
+    header['CRVAL1'] = RA
+
+    # Define the DEC coordinate
+    header['CTYPE2'] = 'DEC--SIN'
+    header['CUNIT2'] = 'DEG'
+    header['CDELT2'] = pixsize_y / 3600
+    header['CRPIX2'] = 0.5 * im_ny + 0.5
+    header['CRVAL2'] = DEC
+
+    # Define the frequency coordiante
+    header['CTYPE3'] = 'FREQ'
+    header['CUNIT3'] = 'Hz'
+    header['CRPIX3'] = 1.
+    header['CDELT3'] = CDELT3
+    header['CRVAL3'] = CRVAL3
+
+    header['SPECSYS'] = 'LSRK'
+    header['VELREF'] = 257
+    header['RESTFREQ'] = restfreq
+    header['BSCALE'] = 1.
+    header['BZERO'] = 0.
+    header['BUNIT'] = 'JY/PIXEL'
+    header['BTYPE'] = 'Intensity'
+
+    hdu.writeto(fitsout, overwrite=True)
+
+    return None

@@ -20,8 +20,7 @@ _k  = sc.k * 1e7
 _G  = sc.G * 1e3
 
 
-def parametric_disk(velax, pars, pars_fixed, 
-                    newcube=True, struct_only=False, tausurf=False): 
+def parametric_disk(velax, pars, pars_fixed):
     """
     Build a parametric disk.
 
@@ -33,6 +32,12 @@ def parametric_disk(velax, pars, pars_fixed,
     """
     # Parse the inputs
     restfreq, FOV, npix, dist, cfg_dict = pars_fixed
+    if 'newcube' not in cfg_dict:
+        cfg_dict['newcube'] = True
+    if 'struct_only' not in cfg_dict:
+        cfg_dict['struct_only'] = False
+    if 'tausurf' not in cfg_dict:
+        cfg_dict['tausurf'] = False
 
     inc, PA, mstar, r_l, Tmid0, Tatm0, qmid, qatm, zq, deltaT, Sig0, \
         p1, p2, xmol, depl, Tfrz, Ncrit, rmax_abund, xi, vlsr, dx, dy = pars
@@ -136,10 +141,10 @@ def parametric_disk(velax, pars, pars_fixed,
     t1 = time.time()
     print('structure time = %f' % ((t1 - t0) / 60.))
 
-    if struct_only:
+    if cfg_dict['struct_only']:
         return 0
 
-    if tausurf:
+    if cfg_dict['tausurf']:
         print('\n Computing emission line photosphere locations... \n')
         tau_locs = struct.get_tausurf(inc, PA, dist, restfreq, FOV, npix, 
                                       taus=2./3., velax=velax, vlsr=vlsr)
@@ -148,7 +153,8 @@ def parametric_disk(velax, pars, pars_fixed,
     else:
         # Build the datacube
         cube = struct.get_cube(inc, PA, dist, restfreq, FOV, npix, 
-                               velax=velax, vlsr=vlsr, newcube=newcube)
+                               velax=velax, vlsr=vlsr, 
+                               newcube=cfg_dict['newcube'])
 
 
         # Pack the cube into a vis_sample SkyImage object and return

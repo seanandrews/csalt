@@ -63,12 +63,12 @@ class model:
         Generate a cube 
     """
     def cube(self, velax, pars, 
-             restfreq=230.538e9, FOV=5.0, Npix=256, dist=150):
+             restfreq=230.538e9, FOV=5.0, Npix=256, dist=150, cfg_dict={}):
 
         # Parse inputs
         if isinstance(velax, list): 
             velax = np.array(velax)
-        fixed = restfreq, FOV, Npix, dist, {}
+        fixed = restfreq, FOV, Npix, dist, cfg_dict
 
         # Load the appropriate prescription
         pfile = 'parametric_disk_'+self.prescription
@@ -145,6 +145,8 @@ class model:
             kw['doppcorr'] = 'approx'
         if 'SRF' not in kw:
             kw['SRF'] = 'ALMA'
+        if 'cfg_dict' not in kw:
+            kw['cfg_dict'] = {}
 
         # List of input EBs
         EBlist = range(ddict['Nobs'])
@@ -162,7 +164,8 @@ class model:
                                                Nup=kw['Nup'],
                                                noise_inject=kw['noise_inject'],
                                                doppcorr=kw['doppcorr'], 
-                                               SRF=kw['SRF'])
+                                               SRF=kw['SRF'],
+                                               cfg_dict=kw['cfg_dict'])
             return m_
         else:
             p_, n_ = copy.deepcopy(ddict), copy.deepcopy(ddict)
@@ -176,7 +179,8 @@ class model:
                                                 Nup=kw['Nup'],
                                                 noise_inject=kw['noise_inject'],
                                                 doppcorr=kw['doppcorr'],
-                                                SRF=kw['SRF'])
+                                                SRF=kw['SRF'],
+                                                cfg_dict=kw['cfg_dict'])
             return p_, n_
 
 
@@ -185,7 +189,8 @@ class model:
     def modelset(self, dset, pars,
                  restfreq=230.538e9, FOV=5.0, Npix=256, dist=150, chpad=2, 
                  Nup=None, noise_inject=None, doppcorr='approx', SRF='ALMA',
-                 gcf_holder=None, corr_cache=None, return_holders=False):
+                 gcf_holder=None, corr_cache=None, return_holders=False,
+                 cfg_dict={}):
 
         """ Prepare the spectral grids: format = [timestamps, channels] """
         # Pad the LSRK frequencies
@@ -221,7 +226,8 @@ class model:
 
                 # make a cube
                 icube = self.cube(vel[itime,:], pars, restfreq=restfreq,
-                                  FOV=FOV, Npix=Npix, dist=dist)
+                                  FOV=FOV, Npix=Npix, dist=dist, 
+                                  cfg_dict=cfg_dict)
 
                 # visibility indices for this timestamp only
                 ixl = np.min(np.where(dset.tstamp == itime))
@@ -246,7 +252,7 @@ class model:
 
             # make a cube
             icube = self.cube(v_model, pars, restfreq=restfreq,
-                              FOV=FOV, Npix=Npix, dist=dist)
+                              FOV=FOV, Npix=Npix, dist=dist, cfg_dict=cfg_dict)
 
             # sample the FFT on the (u, v) spacings
             if return_holders:
@@ -277,7 +283,7 @@ class model:
         elif doppcorr is None:
             # make a cube
             icube = self.cube(vel[0,:], pars, restfreq=restfreq,
-                              FOV=FOV, Npix=Npix, dist=dist)
+                              FOV=FOV, Npix=Npix, dist=dist, cfg_dict=cfg_dict)
 
             # sample the FFT on the (u, v) spacings
             if return_holders:
@@ -374,7 +380,6 @@ class model:
 
         # Parse / determine the executions
         if np.isscalar(config): config = np.array([config])
-        if np.isscalar(t_total): t_total = np.array([t_total])
         Nobs = len(config)
 
         # things to format check:
@@ -384,6 +389,7 @@ class model:
                 # msfile has proper '.ms' ending
 
         # If only scalars specified for keywords, copy them for each execution
+        if np.isscalar(t_total): t_total = np.repeat(t_total, Nobs)
         if np.isscalar(dnu_native): dnu_native = np.repeat(dnu_native, Nobs)
         if np.isscalar(V_span): V_span = np.repeat(V_span, Nobs)
         if np.isscalar(V_tune): V_tune = np.repeat(V_tune, Nobs)

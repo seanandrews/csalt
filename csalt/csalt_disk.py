@@ -72,6 +72,7 @@ class csalt_disk:
                 is 2D and both front and back coordinates are populated.
         """
         r, t, z = self._deproject(x0, y0, inc, PA, z_func)
+        rm, tm, zm = self._deproject(x0, y0, inc, PA, None)
         if side.lower() == 'both':
             self.r_disk_f, self.t_disk_f, self.z_disk_f = r * dist, t, z * dist
             self.x0_f, self.y0_f = x0, y0
@@ -85,6 +86,12 @@ class csalt_disk:
             self.dist_b = dist
             self.x_disk_b = self.r_disk_b * np.cos(self.t_disk_b)
             self.y_disk_b = self.r_disk_b * np.sin(self.t_disk_b)
+            self.r_disk_m, self.t_disk_m, self.z_disk_m = rm*dist, tm, zm*dist
+            self.x0_m, self.y0_m = x0, y0
+            self.inc_m, self.PA_m = inc, PA
+            self.dist_m = dist
+            self.x_disk_m = self.r_disk_m * np.cos(self.t_disk_m)
+            self.y_disk_m = self.r_disk_m * np.sin(self.t_disk_m)
         elif side.lower() == 'front':
             self.r_disk_f, self.t_disk_f, self.z_disk_f = r * dist, t, z * dist
             self.x0_f, self.y0_f = x0, y0
@@ -99,6 +106,13 @@ class csalt_disk:
             self.dist_b = dist
             self.x_disk_b = self.r_disk_b * np.cos(self.t_disk_b)
             self.y_disk_b = self.r_disk_b * np.sin(self.t_disk_b)
+        elif side.lower() == 'mid':
+            self.r_disk_m, self.t_disk_m, self.z_disk_m = rm*dist, tm, zm*dist
+            self.x0_m, self.y0_m = x0, y0
+            self.inc_m, self.PA_m = inc, PA
+            self.dist_m = dist
+            self.x_disk_m = self.r_disk_m * np.cos(self.t_disk_m)
+            self.y_disk_m = self.r_disk_m * np.sin(self.t_disk_m)
         else:
             raise ValueError("`side` must be 'front', 'back' or None.")
 
@@ -242,10 +256,13 @@ class csalt_disk:
         if side.lower() == 'both':
             self.Tgas_f = np.clip(function(self.r_disk_f), a_min=min, a_max=max)
             self.Tgas_b = np.clip(function(self.r_disk_b), a_min=min, a_max=max)
+            self.Tgas_m = np.clip(function(self.r_disk_m), a_min=min, a_max=max)
         elif side.lower() == 'front':
             self.Tgas_f = np.clip(function(self.r_disk_f), a_min=min, a_max=max)
         elif side.lower() == 'back':
             self.Tgas_b = np.clip(function(self.r_disk_b), a_min=min, a_max=max)
+        elif side.lower() == 'mid':
+            self.Tgas_m = np.clip(function(self.r_disk_m), a_min=min, a_max=max)
         else:
             raise ValueError("`side` must be 'front', 'back' or 'both'.")
 
@@ -256,10 +273,13 @@ class csalt_disk:
         if side.lower() == 'both':
             self.dV_f = np.clip(function(self.r_disk_f), a_min=min, a_max=max)
             self.dV_b = np.clip(function(self.r_disk_b), a_min=min, a_max=max)
+            self.dV_m = np.clip(function(self.r_disk_m), a_min=min, a_max=max)
         elif side.lower() == 'front':
             self.dV_f = np.clip(function(self.r_disk_f), a_min=min, a_max=max)
         elif side.lower() == 'back':
             self.dV_b = np.clip(function(self.r_disk_b), a_min=min, a_max=max)
+        elif side.lower() == 'mid':
+            self.dV_m = np.clip(function(self.r_disk_m), a_min=min, a_max=max)
         else:
             raise ValueError("`side` must be 'front', 'back' or 'both'.")
 
@@ -270,10 +290,13 @@ class csalt_disk:
         if side.lower() == 'both':
             self.tau_f = np.clip(function(self.r_disk_f), a_min=min, a_max=max)
             self.tau_b = np.clip(function(self.r_disk_b), a_min=min, a_max=max)
+            self.tau_m = np.clip(function(self.r_disk_m), a_min=min, a_max=max)
         elif side.lower() == 'front':
             self.tau_f = np.clip(function(self.r_disk_f), a_min=min, a_max=max)
         elif side.lower() == 'back':
             self.tau_b = np.clip(function(self.r_disk_b), a_min=min, a_max=max)
+        elif side.lower() == 'mid':
+            self.tau_m = np.clip(function(self.r_disk_m), a_min=min, a_max=max)
         else:
             raise ValueError("`side` must be 'front', 'back' or 'both'.")
 
@@ -282,15 +305,20 @@ class csalt_disk:
         Populate the rotation velocity profiles.
         """
         if side.lower() == 'both':
-            self.vtheta_f = np.clip(function(self.r_disk_f),
+            self.vtheta_f = np.clip(function(self.r_disk_f, self.z_disk_f),
                                     a_min=min, a_max=max)
-            self.vtheta_b = np.clip(function(self.r_disk_b),
+            self.vtheta_b = np.clip(function(self.r_disk_b, self.z_disk_b),
+                                    a_min=min, a_max=max)
+            self.vtheta_m = np.clip(function(self.r_disk_m, self.z_disk_m),
                                     a_min=min, a_max=max)
         elif side.lower() == 'front':
-            self.vtheta_f = np.clip(function(self.r_disk_f),
+            self.vtheta_f = np.clip(function(self.r_disk_f, self.z_disk_f),
                                     a_min=min, a_max=max)
         elif side.lower() == 'back':
-            self.vtheta_b = np.clip(function(self.r_disk_b),
+            self.vtheta_b = np.clip(function(self.r_disk_b, self.z_disk_b),
+                                    a_min=min, a_max=max)
+        elif side.lower() == 'mid':
+            self.vtheta_m = np.clip(function(self.r_disk_m, self.z_disk_m),
                                     a_min=min, a_max=max)
         else:
             raise ValueError("`side` must be 'front', 'back' or 'both'.")
@@ -305,6 +333,11 @@ class csalt_disk:
     @property
     def vtheta_b_proj(self):
         vt = self.vtheta_b * np.cos(self.t_disk_b)
+        return vt * np.sin(abs(np.radians(self.inc)))
+
+    @property
+    def vtheta_m_proj(self):
+        vt = self.vtheta_m * np.cos(self.t_disk_m)
         return vt * np.sin(abs(np.radians(self.inc)))
 
     def get_cube(self, velax, restfreq=230.538e9, vlsr=0.0):
@@ -331,9 +364,23 @@ class csalt_disk:
                         (sc.k * self.Tgas_f[None, :, :])) - 1.0)
 
         # emission distribution (front surface)
-        Inu_f = Bnu_f * (1.0 - np.exp(-tau_nuf)) / \
-                (1.0 - np.exp(-self.tau_f[None, :, :]))
+        Inu_f = Bnu_f * (1.0 - np.exp(-tau_nuf))
         Inu_f = np.where(np.isfinite(Inu_f), Inu_f, 0.0)
+
+        # spectrally-dependent optical depths (midplane)
+        tau_num = self.gaussian(velax[:, None, None],
+                                self.vtheta_m_proj[None, :, :] + vlsr,
+                                self.dV_m[None, :, :] / np.sqrt(2.0),
+                                self.tau_m[None, :, :])
+
+        # Planck function (midplane)
+        Bnu_m = (2 * sc.h * nuax[:, None, None]**3 / sc.c**2) / \
+                (np.exp(sc.h * nuax[:, None, None] / \
+                        (sc.k * self.Tgas_m[None, :, :])) - 1.0)
+
+        # emission distribution (midplane)
+        Inu_m = Bnu_m * (1.0 - np.exp(-tau_num)) * np.exp(-tau_nuf) 
+        Inu_m = np.where(np.isfinite(Inu_m), Inu_m, 0.0)
 
         # spectrally-dependent optical depths (back surface)
         tau_nub = self.gaussian(velax[:, None, None],
@@ -347,13 +394,11 @@ class csalt_disk:
                         (sc.k * self.Tgas_b[None, :, :])) - 1.0)
 
         # emission distribution (back surface)
-        Inu_b = Bnu_b * (1.0 - np.exp(-tau_nub)) / \
-                (1.0 - np.exp(-self.tau_b[None, :, :]))
-        Inu_b = Inu_b * np.exp(-tau_nuf)
+        Inu_b = Bnu_b * (1.0 - np.exp(-tau_nub)) * np.exp(-tau_nuf - tau_num)
         Inu_b = np.where(np.isfinite(Inu_b), Inu_b, 0.0)
 
         # combined emission distribution, to proper Jy/pixel units
-        Inu = Inu_f + Inu_b
+        Inu = Inu_f + Inu_b + Inu_m
         pix_area = (self.cell_sky * np.pi / 180. / 3600.)**2
         Inu *= 1e26 * pix_area
 

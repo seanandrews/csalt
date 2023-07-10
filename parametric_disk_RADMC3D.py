@@ -40,7 +40,7 @@ def parametric_disk(velax, pars, pars_fixed):
         cfg_dict['tausurf'] = False
 
     inc, PA, mstar, r_l, Tmid0, Tatm0, qmid, qatm, zq, deltaT, Sig0, \
-        p1, p2, xmol, depl, Tfrz, Ncrit, rmax_abund, xi, vlsr, dx, dy = pars
+        p1, p2, xmol, depl, ab_zlo, ab_zhi, rmax_ab, xi, vlsr, dx, dy = pars
 
     # Fixed and adjusted parameters
     r0 = 10 * _AU
@@ -68,59 +68,10 @@ def parametric_disk(velax, pars, pars_fixed):
 
     # Set up the abundance function
     def abund(r, z):
-        # sophisticated boundary mode
-        zcrit = np.zeros_like(r)
-        for i in range(r.shape[0]):
-            for j in range(r.shape[1]):
-                # define an artificial z grid
-                zg = np.linspace(0, 5.*r[i,j], 1024)
-
-                # vertical sound speed profile
-                cs = np.sqrt(_k * T_gas(r[i,j], zg) / (_mu * _mH))
-
-                # vertical log(sound speed) gradient
-                dlnc, dz = np.diff(np.log(cs)), np.diff(zg)
-                dlncdz = np.append(dlnc, dlnc[-1]) / np.append(dz, dz[-1])
-
-                # vertical gravity from star
-                gz_star = omega_Kep(r[i,j], zg)**2 * zg
- 
-                # vertical gravity from disk
-                if cfg_dict['dens_selfgrav']:
-                    gz_disk = 2 * np.pi * _G * Sigma_gas(r[i,j])
-                else:
-                    gz_disk = 0.
-
-                # total vertical gravity
-                gz = gz_star + gz_disk
-
-                # vertical log(density) gradient profile
-                dlnpdz = -gz / cs**2 - 2 * dlncdz
-
-                # numerical integration
-                lnp = integrate.cumtrapz(dlnpdz, zg, initial=0)
-                rho0 = np.exp(lnp)
-
-                # normalize
-                rho = 0.5 * rho0 * Sigma_gas(r[i,j])
-                rho /= integrate.trapz(rho0, zg)
-
-                # to number densities
-                n_ = rho / (_mu * _mH)
-                ngas = np.clip(n_, a_min=100, a_max=1e50)
-
-                # flip to integrate downwards in z
-                fngas, fz = ngas[::-1], zg[::-1]
-
-                # vertically-integrated column profile
-                Nz = -integrate.cumtrapz(fngas, fz, initial=0)
-
-                # interpolate to find critical height
-                zint = interp1d(Nz, fz, kind='linear', fill_value='extrapolate')
-                zcrit[i,j] = zint(Ncrit)
-
-        z_mask = np.logical_and(z <= zcrit, T_gas(r, z) >= Tfrz)
-        layer_mask = np.logical_and(z_mask, (r <= rmax_abund * _AU))
+        H = np.sqrt(_k * Tmid0 * (r / r0)**qmid / (_mu * _mH)) / \
+            omega_Kep(r, np.zeros_like(r))
+        z_mask = np.logical_and(z >= ab_zlo * H, z <= ab_zhi * H)
+        layer_mask = np.logical_and(z_mask, (r <= rmax_ab * _AU))
         return np.where(layer_mask, xmol, xmol * depl)
 
 

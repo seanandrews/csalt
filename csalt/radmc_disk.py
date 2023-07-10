@@ -117,6 +117,8 @@ class radmc_setup:
         self.t_centers = np.average([self.t_walls[:-1], self.t_walls[1:]],
                                     axis=0)
         assert self.t_centers.size == self.nt
+#        print(self.t_centers)
+#        sys.exit()
 
         # phi (azimuth angle) grid in [rad]
         self.p_min = args.get("p_min", 0.0)

@@ -5,9 +5,10 @@ import importlib
 import datetime
 import numpy as np
 import scipy.constants as sc
-from astropy.io import fits
+from astropy.io import fits, ascii
 from csalt.keplerian_mask import *
 from casatasks import tclean
+from vis_sample.classes import SkyImage
 import casatools
 
 
@@ -360,3 +361,44 @@ def cube_to_fits(sky_image, fitsout, RA=0., DEC=0., restfreq=230.538e9):
     hdu.writeto(fitsout, overwrite=True)
 
     return None
+
+
+def radmc_to_fits(path_to_image, fitsout, 
+                  dist=150., RA=0., DEC=0., restfreq=230.538e9):
+
+    # Image filename
+    if path_to_image[-4:] == '.out':
+        ifile = path_to_image
+    else:
+        ifile = path_to_image + 'image.out'
+
+    # load the output into a proper cube array
+    imagefile = open(ifile)
+    iformat = imagefile.readline()
+    im_nx, im_ny = imagefile.readline().split() #npixels along x and y axes
+    im_nx, im_ny = int(im_nx), int(im_ny)
+    nlam = int(imagefile.readline())
+
+    pixsize_x, pixsize_y = imagefile.readline().split() #pixel sizes in cm 
+    pixsize_x = float(pixsize_x)
+    pixsize_y = float(pixsize_y)
+
+    imvals = ascii.read(ifile, format='fast_csv',
+                        guess=False, data_start=4,
+                        fast_reader={'use_fast_converter':True})['1']
+    lams = imvals[:nlam]
+
+    # erg cm^-2 s^-1 Hz^-1 str^-1 --> Jy / pixel
+    cube = np.reshape(imvals[nlam:],[nlam, im_ny, im_nx])
+    cube *= 1e23 * pixsize_x * pixsize_y / (dist * 1e2 * sc.parsec)**2
+
+    # Pack the cube into a vis_sample SkyImage object and FITS file
+    mod_data = np.rollaxis(cube, 0, 3)
+    mod_ra  = pixsize_x * (np.arange(im_nx) - 0.5 * im_nx)
+    mod_dec = pixsize_y * (np.arange(im_ny) - 0.5 * im_ny)
+    freq = sc.c / (lams * 1e-6)
+
+    skyim = SkyImage(mod_data, mod_ra, mod_dec, freq, None)
+    foo = cube_to_fits(skyim, fitsout, RA, DEC, restfreq=restfreq)
+
+    return

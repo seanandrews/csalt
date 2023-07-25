@@ -56,6 +56,9 @@ class model:
 
         if np.logical_or((path != os.getcwd()), (path is not None)):
             sys.path.append(path)
+            self.path = path
+        else:
+            self.path = ''
         self.prescription = prescription
 
 
@@ -281,6 +284,7 @@ class model:
                 mvis_[0,:,ixl:ixh,1] = interp_vis.imag
                 mvis_[1,:,ixl:ixh,1] = interp_vis.imag
         elif doppcorr is None:
+            print('I AM NOT DOING A DOPPLER CORRECTION!')
             # make a cube
             icube = self.cube(vel[0,:], pars, restfreq=restfreq,
                               FOV=FOV, Npix=Npix, dist=dist, cfg_dict=cfg_dict)
@@ -308,6 +312,7 @@ class model:
             kernel = self.SRF_kernel(SRF, Nup=Nup)
             mvis_pure = convolve1d(mvis_, kernel, axis=1, mode='nearest')
         else:
+            print('I AM NOT DOING AN SRF CONVOLUTION!')
             mvis_pure = 1. * mvis_
 
         # Decimate and package the pure visibility spectra

@@ -8,8 +8,8 @@ mpl.rcParams['backend'] = 'TkAgg'
 
 
 # User inputs
-name = 'ALMA_BLC_122kHz'
-dnu_ = 122e3
+name = 'ALMA_BLC_244kHz'
+dnu_ = 244e3
 SRF_ = 'ALMA'
 
 storage_dir = 'regridding_storage/'
@@ -22,18 +22,28 @@ cm = model('CSALT0')
 
 # Create an empty MS from scratch
 cdir = configs_dir
-cm.template_MS(storage_dir+'template_'+name+'.ms', 
-               config=[configs_dir+'alma.cycle8.4.cfg', 
-                       configs_dir+'alma.cycle8.7.cfg',
-                       configs_dir+'alma.cycle8.7.cfg',
-                       configs_dir+'alma.cycle8.7.cfg',
+#cm.template_MS(storage_dir+'template_'+name+'.ms', 
+#               config=[configs_dir+'alma.cycle8.4.cfg', 
+#                       configs_dir+'alma.cycle8.7.cfg',
+#                       configs_dir+'alma.cycle8.7.cfg',
+#                       configs_dir+'alma.cycle8.7.cfg',
+#                       configs_dir+'alma.cycle8.7.cfg'],
+#               t_total='60min', t_integ='30s', observatory='ALMA',
+#               date=['2025/03/01', '2025/05/20', '2025/05/20', 
+#                     '2025/05/27', '2025/05/27'], 
+#               HA_0=['-0.5h', '-1.0h', '0.0h', '-1.0h', '0.0h'],
+#               restfreq=230.538e9, dnu_native=dnu_, V_span=7.5e3,
+#               RA='16:00:00.00', DEC='-30:00:00.00')
+
+cm.template_MS(storage_dir+'template_'+name+'.ms',
+               config=[configs_dir+'alma.cycle8.4.cfg',
                        configs_dir+'alma.cycle8.7.cfg'],
                t_total='60min', t_integ='30s', observatory='ALMA',
-               date=['2025/03/01', '2025/05/20', '2025/05/20', 
-                     '2025/05/27', '2025/05/27'], 
-               HA_0=['-0.5h', '-1.0h', '0.0h', '-1.0h', '0.0h'],
+               date=['2025/03/01', '2025/05/27'],
+               HA_0=['-0.5h', '-1.0h'],
                restfreq=230.538e9, dnu_native=dnu_, V_span=7.5e3,
                RA='16:00:00.00', DEC='-30:00:00.00')
+
 
 # Get the data dictionary from the empty MS
 ddict = read_MS(storage_dir+'template_'+name+'.ms')

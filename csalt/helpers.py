@@ -107,16 +107,17 @@ def read_MS(msfile):
 """
 Function to write contents of a data dictionary to MS file 
 """
-def write_MS(data_dict, outfile='out.ms', resid=False):
+def write_MS(data_dict, outfile='out.ms', resid=False, direct_file=False):
 
     # Copy the input MS file to the output file
-    if not os.path.exists(data_dict['input_file']):
-        print('I cannot find the input MS file '+data_dict['input_file']+\
-              ' to make a copy.  Exiting.')
-        sys.exit()
-    else:
-        os.system('rm -rf '+outfile)
-        os.system('cp -r '+data_dict['input_file']+' '+outfile)
+    if not direct_file:
+        if not os.path.exists(data_dict['input_file']):
+            print('I cannot find the input MS file '+data_dict['input_file']+\
+                  ' to make a copy.  Exiting.')
+            sys.exit()
+        else:
+            os.system('rm -rf '+outfile)
+            os.system('cp -r '+data_dict['input_file']+' '+outfile)
 
     # Loop over the observations to pack into the MS file
     ms = casatools.ms()

@@ -42,7 +42,7 @@ class dataset:
 """
     Function to read contents of MS file into a data dictionary.
 """
-def read_MS(msfile):
+def read_MS(msfile, overwrite_topo=False):
 
     # Make sure the file exists
     if not os.path.exists(msfile):
@@ -82,12 +82,16 @@ def read_MS(msfile):
         nu_ = np.empty((len(tstamps), len(nu)))
 
         # Loop over timestamps to populate index and LSRK frequency grids
-        for istamp in range(len(tstamps)):
-            tstamp_ID[d['time'] == tstamps[istamp]] = istamp
-            nu_[istamp,:] = ms.cvelfreqs(spwids=[EB],
-                                         mode='channel',
-                                         outframe='LSRK',
-                                         obstime=str(tstamps[istamp])+'s')
+        if overwrite_topo:
+            for istamp in range(len(tstamps)):
+                nu_[istamp,:] = 1. * nu
+        else:
+            for istamp in range(len(tstamps)):
+                tstamp_ID[d['time'] == tstamps[istamp]] = istamp
+                nu_[istamp,:] = ms.cvelfreqs(spwids=[EB],
+                                             mode='channel',
+                                             outframe='LSRK',
+                                             obstime=str(tstamps[istamp])+'s')
 
         # Close the MS file
         ms.close()

@@ -75,9 +75,10 @@ class model:
 
         # Load the appropriate prescription
         pfile = 'parametric_disk_'+self.prescription
-        if not os.path.exists(pfile+'.py'):
+        if not os.path.exists(self.path+pfile+'.py'):
             print('The prescription '+pfile+'.py does not exist.  Exiting.')
             sys.exit()
+        sys.path.append(self.path)
         pd = importlib.import_module(pfile)
 
         # Calculate the emission cube
@@ -111,7 +112,7 @@ class model:
                 print('I do not know that SRF type.  Exiting.')
                 sys.exit()
 
-            return srf / np.trapz(srf, xch)
+            return srf / np.sum(srf)	#np.trapz(srf, xch)
 
         # Approximations for sampled-in-place spectra
         else:
@@ -219,7 +220,8 @@ class model:
         vel = sc.c * (1 - nu / restfreq)
 
         ### - Compute the model visibilities
-        mvis_ = np.squeeze(np.empty((dset.npol, nch, dset.nvis, 2)))
+        mvis_ = np.squeeze(np.ones((dset.npol, nch, dset.nvis, 2)))
+        print(mvis_.shape)
 
         # *Exact* Doppler correction calculation
         if doppcorr == 'exact':
@@ -303,6 +305,11 @@ class model:
                                   gcf_holder=gcf_holder, corr_cache=corr_cache,
                                   mu_RA=pars[-2], mu_DEC=pars[-1],
                                   mod_interp=False).T
+                mvis_[0,:,:,0] = 1. * mvis.real
+                mvis_[1,:,:,0] = 1. * mvis.real
+                mvis_[0,:,:,1] = 1. * mvis.imag
+                mvis_[1,:,:,1] = 1. * mvis.imag
+                 
         else:
             print('You need to specify a doppcorr method.  Exiting.')
             sys.exit()

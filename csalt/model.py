@@ -49,7 +49,7 @@ class dataset:
 """
 class model:
 
-    def __init__(self, prescription, path=None, quiet=True):
+    def __init__(self, prescription, path='', quiet=True):
 
         if quiet:
             warnings.filterwarnings("ignore")

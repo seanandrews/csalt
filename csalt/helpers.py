@@ -307,7 +307,8 @@ def doppler_set(nu_rest, vel_tune, datestring, RA, DEC,
     return nu_top['m0']['value']
 
 
-def cube_to_fits(sky_image, fitsout, RA=0., DEC=0., restfreq=230.538e9):
+def cube_to_fits(sky_image, fitsout, RA=0., DEC=0., restfreq=230.538e9,
+                 bunit='JY/PIXEL', beam=None):
 
     # revert to proper formatting
     cube = np.rollaxis(np.fliplr(sky_image.data), -1)
@@ -360,8 +361,13 @@ def cube_to_fits(sky_image, fitsout, RA=0., DEC=0., restfreq=230.538e9):
     header['RESTFREQ'] = restfreq
     header['BSCALE'] = 1.
     header['BZERO'] = 0.
-    header['BUNIT'] = 'JY/PIXEL'
+    header['BUNIT'] = bunit
     header['BTYPE'] = 'Intensity'
+
+    if beam is not None:
+        header['BMAJ'] = beam[0] / 3600
+        header['BMIN'] = beam[1] / 3600
+        header['BPA'] = beam[2]
 
     hdu.writeto(fitsout, overwrite=True)
 

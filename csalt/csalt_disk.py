@@ -177,14 +177,19 @@ class csalt_disk:
         x_mid, y_mid = self._get_midplane_cart_coords(x0, y0, inc, PA)
         return np.hypot(y_mid, x_mid), np.arctan2(y_mid, x_mid)
 
-    def _get_flared_coords(self, x0, y0, inc, PA, z_func):
+    def _get_flared_coords(self, x0, y0, inc, PA, z_func, maxzr=0.7):
         """
         Return cylindrical coordinates of surface in [arcsec, radians].
+        Note here we include a limit of |z/r| < maxzr to avoid issues with the
+        deprojection.
         """
         x_mid, y_mid = self._get_midplane_cart_coords(x0, y0, inc, PA)
+        r_mid = np.hypot(x_mid, y_mid)
         r_tmp, t_tmp = np.hypot(x_mid, y_mid), np.arctan2(y_mid, x_mid)
         for _ in range(5):
-            y_tmp = y_mid + z_func(r_tmp) * np.tan(np.radians(inc))
+            z_tmp = np.clip(z_func(r_tmp), 
+                            a_min=-maxzr/r_mid, a_max=maxzr/r_mid)
+            y_tmp = y_mid + z_tmp * np.tan(np.radians(inc))
             r_tmp = np.hypot(y_tmp, x_mid)
             t_tmp = np.arctan2(y_tmp, x_mid)
         return r_tmp, t_tmp, z_func(r_tmp)

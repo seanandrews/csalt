@@ -103,7 +103,8 @@ class model:
                 srf = (np.sinc(xch))**2
             # ALMA-WSU
             elif srf_type in ['ALMA-WSU']:
-                _wsu = np.load('csalt/data/WSU_SRF.npz')
+                _wsu = np.load('/pool/asha0/SCIENCE/csalt/csalt/data/'+\
+                               'WSU_SRF.npz')
                 wint = interp1d(_wsu['chix'], _wsu['srf'], 
                                 fill_value='extrapolate', kind='cubic')
                 srf = wint(xch)
@@ -112,7 +113,7 @@ class model:
                 print('I do not know that SRF type.  Exiting.')
                 sys.exit()
 
-            return srf / np.sum(srf)	#np.trapz(srf, xch)
+            return srf / np.sum(srf)
 
         # Approximations for sampled-in-place spectra
         else:

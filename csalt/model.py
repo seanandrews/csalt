@@ -150,6 +150,8 @@ class model:
             kw['doppcorr'] = 'approx'
         if 'SRF' not in kw:
             kw['SRF'] = 'ALMA'
+        if 'online_avg' not in kw:
+            kw['online_avg'] = 1
         if 'cfg_dict' not in kw:
             kw['cfg_dict'] = {}
 
@@ -170,6 +172,7 @@ class model:
                                                noise_inject=kw['noise_inject'],
                                                doppcorr=kw['doppcorr'], 
                                                SRF=kw['SRF'],
+                                               online_avg=kw['online_avg'],
                                                cfg_dict=kw['cfg_dict'])
             return m_
         else:
@@ -185,6 +188,7 @@ class model:
                                                 noise_inject=kw['noise_inject'],
                                                 doppcorr=kw['doppcorr'],
                                                 SRF=kw['SRF'],
+                                                online_avg=kw['online_avg'],
                                                 cfg_dict=kw['cfg_dict'])
             return p_, n_
 
@@ -194,17 +198,33 @@ class model:
     def modelset(self, dset, pars,
                  restfreq=230.538e9, FOV=5.0, Npix=256, dist=150, chpad=2, 
                  Nup=None, noise_inject=None, doppcorr='approx', SRF='ALMA',
-                 gcf_holder=None, corr_cache=None, return_holders=False,
-                 cfg_dict={}):
+                 online_avg=1, gcf_holder=None, corr_cache=None, 
+                 return_holders=False, cfg_dict={}):
 
         """ Prepare the spectral grids: format = [timestamps, channels] """
+        # Revert to original un-averaged grid if online binning was applied
+        if online_avg > 1:
+            # mean LSRK channel spacings
+            _dnu = np.mean(np.diff(dset.nu_LSRK, axis=1), axis=1)
+
+            # pad
+            _nu = np.column_stack((dset.nu_LSRK, dset.nu_LSRK[:,-1] + _dnu))
+
+            # upsample and shift
+            nu_ = np.interp(np.arange((len(_nu)-1) * online_avg + 1),
+                            np.arange(0, len(_nu) * online_avg, online_avg),
+                            _nu)[:-1] - 0.5 * _dnu
+            nu_LSRK = 1. * nu_
+        else:
+            nu_LSRK = 1. * dset.nu_LSRK
+
         # Pad the LSRK frequencies
-        dnu_n = (np.diff(dset.nu_LSRK, axis=1)[:,0])[:,None]
-        _pad = (dset.nu_LSRK[:,0])[:,None] + \
+        dnu_n = (np.diff(nu_LSRK, axis=1)[:,0])[:,None]
+        _pad = (nu_LSRK[:,0])[:,None] + \
                 dnu_n * np.arange(-chpad, 0, 1)[None,:]
-        pad_ = (dset.nu_LSRK[:,-1])[:,None] + \
+        pad_ = (nu_LSRK[:,-1])[:,None] + \
                 dnu_n * np.arange(1, chpad+1, 1)[None,:]
-        nu_ = np.concatenate((_pad, dset.nu_LSRK, pad_), axis=1)
+        nu_ = np.concatenate((_pad, nu_LSRK, pad_), axis=1)
 
         # Upsample the LSRK frequencies (if requested)
         if Nup is not None:
@@ -326,6 +346,13 @@ class model:
         # Decimate and package the pure visibility spectra
         mvis_pure = mvis_pure[:,::Nup,:,:]
         mvis_pure = mvis_pure[:,chpad:-chpad,:,:]
+        # re-bin to emulate online averaging
+        if online_avg > 1:
+            t_ = np.transpose(mvis_pure, (1, 0, 2, 3))
+            _ = [np.take(t_, np.arange(i*online_avg, 
+                                       (i+1)*online_avg), 0).mean(axis=0) \
+                 for i in np.arange(mvis_pure.shape[1] // online_avg)]
+            mvis_pure = np.array(_).transpose((1, 0, 2, 3))
         mvis_p = mvis_pure[:,:,:,0] + 1j * mvis_pure[:,:,:,1]
         mset_p = dataset(dset.um, dset.vm, mvis_p, dset.wgt, dset.nu_TOPO,
                          dset.nu_LSRK, dset.tstamp)
@@ -348,6 +375,13 @@ class model:
             # Decimate and package the pure visibility spectra
             mvis_noisy = mvis_noisy[:,::Nup,:,:]
             mvis_noisy = mvis_noisy[:,chpad:-chpad,:,:]
+            # re-bin to emulate online averaging
+            if online_avg > 1:
+                t_ = np.transpose(mvis_noisy, (1, 0, 2, 3))
+                _ = [np.take(t_, np.arange(i*online_avg, 
+                                           (i+1)*online_avg), 0).mean(axis=0) \
+                     for i in np.arange(mvis_noisy.shape[1] // online_avg)]
+                mvis_noisy = np.array(_).transpose((1, 0, 2, 3))
             mvis_n = mvis_noisy[:,:,:,0] + 1j * mvis_noisy[:,:,:,1]
             mset_n = dataset(dset.um, dset.vm, mvis_n, dset.wgt, dset.nu_TOPO,
                              dset.nu_LSRK, dset.tstamp)

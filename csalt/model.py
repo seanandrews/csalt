@@ -207,14 +207,15 @@ class model:
             # mean LSRK channel spacings
             _dnu = np.mean(np.diff(dset.nu_LSRK, axis=1), axis=1)
 
-            # pad
-            _nu = np.column_stack((dset.nu_LSRK, dset.nu_LSRK[:,-1] + _dnu))
-
-            # upsample and shift
-            nu_ = np.interp(np.arange((len(_nu)-1) * online_avg + 1),
-                            np.arange(0, len(_nu) * online_avg, online_avg),
-                            _nu)[:-1] - 0.5 * _dnu
-            nu_LSRK = 1. * nu_
+            # get the pre-averaged LSRK frequencies for each timestamp
+            nu_LSRK = np.empty((dset.nstamps, online_avg * dset.nchan))
+            for it in range(dset.nstamps):
+                pnu = np.arange(dset.nu_LSRK[it,0], dset.nu_LSRK[it,-1], 
+                                _dnu[it] / online_avg) - \
+                      (online_avg - 1) * _dnu[it] / (2 * online_avg)
+                while len(pnu) < nu_LSRK.shape[1]:
+                    pnu = np.append(pnu, pnu[-1] + _dnu[it] / online_avg)
+                nu_LSRK[it,:] = 1. * pnu   
         else:
             nu_LSRK = 1. * dset.nu_LSRK
 

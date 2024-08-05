@@ -243,7 +243,6 @@ class model:
 
         ### - Compute the model visibilities
         mvis_ = np.squeeze(np.ones((dset.npol, nch, dset.nvis, 2)))
-        print(mvis_.shape)
 
         # *Exact* Doppler correction calculation
         if doppcorr == 'exact':
@@ -350,8 +349,8 @@ class model:
         # re-bin to emulate online averaging
         if online_avg > 1:
             t_ = np.transpose(mvis_pure, (1, 0, 2, 3))
-            _ = [np.take(t_, np.arange(i*online_avg, 
-                                       (i+1)*online_avg), 0).mean(axis=0) \
+            _ = [np.take(t_, np.arange(i * online_avg, 
+                                       (i + 1) * online_avg), 0).mean(axis=0) \
                  for i in np.arange(mvis_pure.shape[1] // online_avg)]
             mvis_pure = np.array(_).transpose((1, 0, 2, 3))
         mvis_p = mvis_pure[:,:,:,0] + 1j * mvis_pure[:,:,:,1]
@@ -544,27 +543,32 @@ class model:
         Function to parse and package visibility data for inference
     """
     def fitdata(self, msfile,
-                vra=None, vcensor=None, restfreq=230.538e9, chbin=1, 
-                well_cond=300):
+                vra=None, vcensor=None, restfreq=230.538e9, 
+                online_avg=1, chbin=2, well_cond=300):
 
         # Load the data from the MS file into a dictionary
         data_dict = read_MS(msfile)
 
-        # If chbin is a scalar, distribute it over the Nobs executions
+        # if chbin or online_avgs scalar, distribute over the Nobs executions
         if np.isscalar(chbin):
             chbin = chbin * np.ones(data_dict['Nobs'], dtype=int)
         else:
             if isinstance(chbin, list):
                 chbin = np.asarray(chbin)
+        if np.isscalar(online_avg):
+            online_avg = online_avg * np.ones(data_dict['Nobs'], dtype=int)
+        else:
+            if isinstance(online_avg, list):
+                online_avg = np.asarray(online_avg)
 
         # If vra is a list, make it an array
         if isinstance(vra, list):
             vra = np.asarray(vra)
 
         # Assign an output dictionary
-        out_dict = {'Nobs': data_dict['Nobs'], 'chbin': chbin}
+        out_dict = {'Nobs': data_dict['Nobs']}
 
-        # Force chbin <= 2
+        # Force chbin <= 2 (TEMPORARY :: NEED TO ACCOMMODATE!)
         if np.any(chbin > 2):
             print('Forcing chbin --> 2; do not over-bin your data!')
         chbin[chbin > 2] = 2
@@ -650,9 +654,13 @@ class model:
 
             # Pre-calculate the spectral covariance matrix 
             # (** note: this assumes the Hanning kernel for ALMA **)
-            if binned:
+            ### NEEDS TO BE UPDATED FOR HIGHER BINNING / AVERAGING FACTORS
+            if chbin[i] == 2:
                 scov = (5/16) * np.eye(bnchan) \
                        + (3/32) * (np.eye(bnchan, k=-1) + np.eye(bnchan, k=1))
+            elif online_avg[i] == 2:
+                scov = (5/16) * np.eye(inchan) \
+                       + (3/32) * (np.eye(inchan, k=-1) + np.eye(inchan, k=1))
             else:
                 scov = (3/8) * np.eye(inchan) \
                        + (1/4) * (np.eye(inchan, k=-1) + np.eye(inchan, k=1)) \
@@ -702,6 +710,8 @@ class model:
             out_dict['lnL0_'+str(i)] = lnL0
             out_dict['gcf_'+str(i)] = None
             out_dict['corr_'+str(i)] = None
+            out_dict['chbin_'+str(i)] = chbin[i]
+            out_dict['online_avg_'+str(i)] = online_avg[i]
 
         # Return the output dictionary
         return out_dict
@@ -711,7 +721,7 @@ class model:
         Sample the posteriors.
     """
     def sample_posteriors(self, msfile, vra=None, vcensor=None, kwargs=None,
-                          restfreq=230.538e9, chbin=1, well_cond=300,
+                          restfreq=230.538e9, chbin=2, well_cond=300,
                           Nwalk=75, Ninits=20, Nsteps=1000, 
                           outpost='stdout.h5', append=False, Nthreads=6):
 
@@ -720,24 +730,42 @@ class model:
         if Nthreads > 1:
             os.environ["OMP_NUM_THREADS"] = "1"
 
+        # Check if the data have been online-averaged in the correlator
+        if kwargs is None:
+            online_avg = 1
+        else:
+            if 'online_avg' not in kwargs:
+                online_avg = 1
+                kwargs['online_avg'] = online_avg
+            else:
+                online_avg = kwargs['online_avg']
+        if online_avg > 1:
+            print(f'User indicates MS has online averaging by {online_avg}x')
+            if online_avg == 2:
+                print('Turning off channel binning for inference.')
+                chbin = 1
+
         # Parse the data into proper format
         infdata = self.fitdata(msfile, vra=vra, vcensor=vcensor, 
-                               restfreq=restfreq, chbin=chbin, 
-                               well_cond=well_cond)
+                               restfreq=restfreq, online_avg=online_avg,
+                               chbin=chbin, well_cond=well_cond)
+
 
         # Initialize the parameters using random draws from the priors
         priors = importlib.import_module('priors_'+self.prescription)
         Ndim = len(priors.pri_pars)
         p0 = np.empty((Nwalk, Ndim))
         for ix in range(Ndim):
-            if ix == 9:
-                p0[:,ix] = np.sqrt(2 * sc.k * p0[:,6] / (28 * (sc.m_p+sc.m_e)))
-            else:
+#            if ix == 9:
+#                p0[:,ix] = np.sqrt(2 * sc.k * p0[:,6] / (28 * (sc.m_p+sc.m_e)))
+#            else:
                 _ = [str(priors.pri_pars[ix][ip])+', '
                      for ip in range(len(priors.pri_pars[ix]))]
                 cmd = 'np.random.'+priors.pri_types[ix]+ \
                       '('+"".join(_)+str(Nwalk)+')'
                 p0[:,ix] = eval(cmd)
+
+
 
         # Acquire and store the GCF and CORR caches for iterative sampling
         for i in range(infdata['Nobs']):
@@ -746,6 +774,7 @@ class model:
                                          FOV=kwargs['FOV'],
                                          Npix=kwargs['Npix'], 
                                          dist=kwargs['dist'],
+                                         online_avg=kwargs['online_avg'],
                                          return_holders=True)
             infdata['gcf_'+str(i)] = gcf
             infdata['corr_'+str(i)] = corr
@@ -773,6 +802,8 @@ class model:
             kw['noise_inject'] = None
         if 'doppcorr' not in kw:
             kw['doppcorr'] = 'approx'
+        if 'online_avg' not in kw:
+            kw['online_avg'] = 1
         if 'SRF' not in kw:
             kw['SRF'] = 'ALMA'
 
@@ -858,14 +889,15 @@ class model:
                                  dist=kwargs['dist'], chpad=kwargs['chpad'],
                                  doppcorr=kwargs['doppcorr'], 
                                  SRF=kwargs['SRF'], 
+                                 online_avg=kwargs['online_avg'],
                                  gcf_holder=fdata['gcf_'+str(i)],
                                  corr_cache=fdata['corr_'+str(i)])
 
             # Spectrally bin the model visibilities if necessary
             # **technically wrong, since the weights are copied like this; 
             # **ideally would propagate the unbinned weights?
-            if fdata['chbin'][i] > 1:
-                oshp = (_mdl.npol, -1, fdata['chbin'][i], _mdl.nvis)
+            if fdata['chbin_'+str(i)] > 1:
+                oshp = (_mdl.npol, -1, fdata['chbin_'+str(i)], _mdl.nvis)
                 wt = np.rollaxis(np.tile(_data.wgt, (2, 1, 1, 1)), 0, 3)
                 mvis = np.average(_mdl.vis.reshape(oshp),
                                   weights=wt.reshape(oshp), axis=2)

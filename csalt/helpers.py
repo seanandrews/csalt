@@ -10,6 +10,11 @@ from csalt.keplerian_mask import *
 from casatasks import tclean
 from vis_sample.classes import SkyImage
 import casatools
+import emcee
+import importlib
+import matplotlib.pyplot as plt
+_ = importlib.import_module('plot_setups')
+plt.style.use(['default', '/home/sandrews/mpl_styles/nice_img.mplstyle'])
 
 
 warnings.filterwarnings("ignore")
@@ -413,3 +418,188 @@ def radmc_to_fits(path_to_image, fitsout,
     foo = cube_to_fits(skyim, fitsout, RA, DEC, restfreq=restfreq)
 
     return
+
+
+
+""" Tools for analyzing posteriors for ensemble sampler MCMC """
+""" some of this is copied from emcee """
+def next_pow_two(n):
+    i = 1
+    while i < n:
+        i = i << 1
+    return i
+
+def autocorr_func_1d(x, norm=True):
+    x = np.atleast_1d(x)
+    if len(x.shape) != 1:
+        raise ValueError("invalid dimensions for 1D autocorr function")
+    n = next_pow_two(len(x))
+
+    # Compute the FFT and then (from that) the auto-correlation function
+    f = np.fft.fft(x - np.mean(x), n=2 * n)
+    acf = np.fft.ifft(f * np.conjugate(f))[: len(x)].real
+    acf /= 4 * n
+
+    # Optionally normalize
+    if norm:
+        acf /= acf[0]
+
+    return acf
+
+# Automated windowing procedure following Sokal (1989)
+def auto_window(taus, c):
+    m = np.arange(len(taus)) < c * taus
+    if np.any(m):
+        return np.argmin(m)
+    return len(taus) - 1
+
+# Following suggestion from Goodman & Weare (2010)
+def autocorr_gw2010(y, c=5.0):
+    f = autocorr_func_1d(np.mean(y, axis=0))
+    taus = 2.0 * np.cumsum(f) - 1.0
+    window = auto_window(taus, c)
+    return taus[window]
+
+# Following @fardal suggestion on emcee github
+def autocorr_new(y, c=5.0):
+    f = np.zeros(y.shape[1])
+    for yy in y:
+        f += autocorr_func_1d(yy)
+    f /= len(y)
+    taus = 2.0 * np.cumsum(f) - 1.0
+    window = auto_window(taus, c)
+    return taus[window]
+
+
+
+def load_posteriors(outfile, autocorr=True, prune_outliers=False, dev_lev=2,
+                    maxtau=50, cutfact=10, burnfact=10, thinfact=1,
+                    return_full=False, return_probs=True):
+
+    # load the backend file
+    reader = emcee.backends.HDFBackend(outfile)
+
+    # get the full samples
+    all_samples = reader.get_chain(discard=0, flat=False)
+
+    # the log-posterior and log-prior values
+    log_post = reader.get_log_prob(discard=0, flat=False)
+    log_prior = reader.get_blobs(discard=0, flat=False)
+
+    if prune_outliers:
+        # all_samples shape
+        nstep, nwalk, ndim = all_samples.shape
+
+        # find outlier walkers
+        ncut = round(nstep / cutfactor)
+        dev_ = (np.median(log_prob[ncut:,:], axis=0) - \
+                np.median(log_prob[ncut:,:])) / np.std(log_prob[ncut:,:])
+        out_ix = np.where(np.abs(dev_) >= dev_lev)
+
+        # remove them
+        all_samples = np.delete(all_samples, out_ix, axis=1)
+        log_post = np.delete(log_post, out_ix, axis=1)
+        log_prior = np.delete(log_prior, out_ix, axis=1)
+
+    if return_full:
+        # return the posterior samples without subsequent reduction
+        if return_probs:
+            return all_samples, log_post, log_prior
+        else:
+            return all_samples
+    else:
+        # compute autocorrelation times (or assign them)
+        if autocorr:
+            tau_ = np.array([autocorr_new(all_samples[:-1,:,ix].T)
+                             for ix in range(all_samples.shape[-1])])
+            tau = np.min([tau_.max(), maxtau])
+        else:
+            tau = 1. * maxtau
+
+        # burn and thin
+        nburn, nthin = round(burnfact * tau), round(thinfact * tau)
+        out_ = all_samples[nburn::nthin,:,:]
+        s = list(out_.shape[1:])
+        s[0] = np.prod(out_.shape[:2])
+        flat_chain = out_.reshape(s)
+
+        # output
+        if return_probs:
+            _log_post = log_post[nburn::nthin,:]
+            _log_prior = log_prior[nburn::nthin,:]
+            flat_log_post = _log_post.reshape(np.prod(_log_post.shape))
+            flat_log_prior = _log_prior.reshape(np.prod(_log_prior.shape))
+            return flat_chain, flat_log_post, flat_log_prior
+        else:
+            return flat_chain
+
+
+def autocorr_evol_plot(outfile, prune_outliers=False, dev_lev=2, Nstep=5):
+
+    # load chains
+    all_samples = load_posteriors(outfile, prune_outliers=prune_outliers,
+                                  dev_lev=dev_lev, return_full=True, 
+                                  return_probs=False)
+
+    # compute autocorrelation time every Nstep steps
+    Nmax = all_samples.shape[0]
+    if (Nmax > Nstep):
+        tau_ix = np.empty(int(Nmax / Nstep))
+        ix = np.empty(int(Nmax / Nstep))
+        for i in range(len(tau_ix)):
+            nn = (i + 1) * Nstep
+            ix[i] = nn
+            tau = emcee.autocorr.integrated_time(all_samples[:nn,:,:], tol=0)
+            tau_ix[i] = np.nanmean(tau)
+    tau_ix = np.nan_to_num(tau_ix)
+
+    fig = plt.figure(constrained_layout=True)
+    plt.plot(ix, tau_ix, '-o')
+    plt.xlabel('steps')
+    plt.ylabel('autocorr time (steps)')
+    plt.xlim([0, Nmax])
+    plt.ylim([0, tau_ix.max() + 0.1 * (tau_ix.max() - tau_ix.min())])
+    fig.savefig('autocorr_evol.png')
+    fig.clf()
+
+
+def trace_plot(outfile, ncols=3, figsize=(10, 11), prune_outliers=False, 
+               dev_lev=2, labels=None, show_probs=True):
+
+    # load chains
+    inps = load_posteriors(outfile, prune_outliers=prune_outliers,
+                           dev_lev=dev_lev, return_full=True,
+                           return_probs=show_probs)
+    if show_probs:
+        all_, post, pri = inps
+        all_samples = np.dstack((all_, post, pri))
+        labels += ['log post', 'log prior']
+    else:
+        all_samples = 1. * inps
+
+    # make the figure object
+    nstep, nwalk, ndim = all_samples.shape
+    nrows = int(np.ceil(ndim / ncols))
+    fig, axs = plt.subplots(ncols=ncols, nrows=nrows, figsize=figsize,
+                            constrained_layout=True)
+
+    # loop over the dimensions and plot the traces
+    for idim in range(ndim):
+        # choose panel
+        ax = axs[np.floor_divide(idim, ncols), idim % ncols]
+
+        for iw in range(nwalk):
+            # plot the trace
+            ax.plot(np.arange(nstep), all_samples[:,iw,idim], 
+                    color='C0', alpha=0.05)
+
+        # boundaries
+        ax.set_xlim([0, nstep])
+        if labels is not None:
+            ax.set_ylabel(labels[idim])
+
+    fig.savefig('traces.png')
+    fig.clf()
+
+
+

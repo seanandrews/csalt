@@ -637,6 +637,8 @@ class model:
             # Channel censoring
             if vcensor is not None:
                 cens_chans = np.ones(inchan, dtype='bool')
+                if not any(isinstance(el, list) for el in vcensor):
+                    vcensor = [vcensor]
                 for j in range(len(vcensor)):
                     if sgn_v < 0:
                         vcens = (vcensor[j])[::-1]
@@ -650,7 +652,7 @@ class model:
                 if binned:
                     bcens_chans = np.all(cens_chans.reshape((-1, chbin[i])),
                                          axis=1)
-                    bwgt[:,cens_chans == False,:] = 0
+                    bwgt[:,bcens_chans == False,:] = 0
 
             # Pre-calculate the spectral covariance matrix 
             # (** note: this assumes the Hanning kernel for ALMA **)
@@ -899,8 +901,8 @@ class model:
             if fdata['chbin_'+str(i)] > 1:
                 oshp = (_mdl.npol, -1, fdata['chbin_'+str(i)], _mdl.nvis)
                 wt = np.rollaxis(np.tile(_data.wgt, (2, 1, 1, 1)), 0, 3)
-                mvis = np.average(_mdl.vis.reshape(oshp),
-                                  weights=wt.reshape(oshp), axis=2)
+                wt[wt == 0.] = 1    # mitigate normalization issue for censored
+                mvis = np.average(_mdl.vis.reshape(oshp), weights=wt, axis=2)
             else:
                 mvis = 1. * _mdl.vis
 

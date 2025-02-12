@@ -1,4 +1,4 @@
-from csalt.csalt_orig import csalt_disk
+from csalt.csalt_rev import csalt_disk
 import scipy.constants as sc
 import numpy as np
 from vis_sample.classes import SkyImage
@@ -25,6 +25,8 @@ def parametric_disk(velax, pars, pars_fixed, quiet=True):
     restfreq, FOV, npix, dist, cfg_dict = pars_fixed
     inc, PA, mstar, r_l, z_10, z_q, Tb_10, Tb_q, Tmax_b, dV_10, \
         logtau_10, tau_q, vlsr, dx, dy = pars
+
+    print(z_10)
 
 
     # Fixed and adjusted parameters
@@ -105,6 +107,7 @@ def parametric_disk(velax, pars, pars_fixed, quiet=True):
     cube = disk.get_cube(velax=velax, restfreq=restfreq, vlsr=vlsr)
     cube = np.nan_to_num(cube)
 
+
     # Convert to standard surface brightness units
     freq = restfreq * (1 - velax / sc.c)
 
@@ -113,4 +116,4 @@ def parametric_disk(velax, pars, pars_fixed, quiet=True):
     mod_ra  = disk.cell_sky * (np.arange(npix) - 0.5 * npix) 
     mod_dec = disk.cell_sky * (np.arange(npix) - 0.5 * npix)
 
-    return SkyImage(mod_data, mod_ra, mod_dec, freq, None)
+    return SkyImage(mod_data, mod_ra, mod_dec, freq, None), disk

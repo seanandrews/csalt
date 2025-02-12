@@ -13,8 +13,8 @@ import matplotlib.pyplot as plt
 velax = np.arange(-3000, 3000, 200.)
 
 # Calculate the cube
-pars = np.array([30, 150, 1.1, 120, 0.3, 1.5, 120, -0.5, 20, 217, 
-                 2.2, -1, 0, 0, 0]
+pars = np.array([65, 0, 1.9, 320, 0.3, 1.5, 120, -0.5, 20, 217, 
+                 2.2, -1, 0, 0, 0])
 
 fixed = 230.538e9, 10.23, 1024, 150, {}
 cube = pardisk_csalt(velax, pars, fixed)

@@ -317,6 +317,7 @@ def cube_to_fits(sky_image, fitsout, RA=0., DEC=0., restfreq=230.538e9,
 
     # revert to proper formatting
     cube = np.rollaxis(np.fliplr(sky_image.data), -1)
+    print(cube.shape)
 
     # extract coordinate information
     im_nfreq, im_ny, im_nx = cube.shape

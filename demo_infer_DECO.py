@@ -8,27 +8,29 @@ from csalt.helpers import *
 sdir = 'storage/data/DECO_tests/'
 
 # Instantiate a csalt model
-cm = model('CSALT_DECO_taper_1_c')
+#cm = model('CSALT_DECO_taper_1_c')
 
 # Define some fixed attributes for the modeling
-fixed_kw = {'FOV': 5.11, 'Npix': 512, 'dist': 160, 'online_avg': 2} 
+#fixed_kw = {'FOV': 5.11, 'Npix': 512, 'dist': 160, 'online_avg': 2} 
 
 # Sample the posteriors!
-_ = cm.sample_posteriors(sdir+'Sz129_200ch.ms', kwargs=fixed_kw,
-                         vra=[1300, 6800], restfreq=230.538e9, 
-                         Nwalk=75, Nthreads=8, Ninits=10, Nsteps=50,
-                         outpost=sdir+'Sz129_posteriors.h5')
+#_ = cm.sample_posteriors(sdir+'Sz129_200ch.ms', kwargs=fixed_kw,
+#                         vra=[1300, 6800], restfreq=230.538e9, 
+#                         Nwalk=75, Nthreads=8, Ninits=10, Nsteps=6000,
+#                         outpost=sdir+'Sz129_posteriors.h5', append=True)
+
+#sys.exit()
 
 
 # Analyze the posteriors
 
 # look at the autocorrelation time evolution
-_ = autocorr_evol_plot(sdir+'Sz129_posteriors.h5')
+_ = autocorr_evol_plot(sdir+'Sz129_posteriors.h5', Nstep=100)
 
 
 # load the burned-in, thinned, flattened posteriors
 chain, logpost, logpri = load_posteriors(sdir+'Sz129_posteriors.h5',
-                                         maxtau=10, burnfact=1, thinfact=0.5)
+                                         maxtau=500, burnfact=10, thinfact=0.5)
 
 
 # make a trace plot

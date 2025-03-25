@@ -48,57 +48,71 @@ class csalt_disk:
 
 
     # -- Populate the disk frame pixel coordinates.  
-    def set_disk_coords(self, dx, dy, incl, PA, dist, z_func=None, 
-                        side='both', r_span=10., N_span=64):
-        # unit conversion
-        inclr, PAr = np.radians(incl), np.radians(PA)
+    def deproj_coords(self, dx, dy, incl, PA, z_func=None, 
+                      side='front', r_span=5., N_span=64):
+        # proper geometric orientation
+        if side == 'front':
+            PAr = np.radians(PA)
+            inc = np.radians(incl)
+            az_sgn = 1.
+        elif side == 'back':
+            PAr = np.radians(PA + 180)
+            inc = -np.radians(incl)
+            az_sgn = -1.
 
         # a "background" (flat) transformation
-        xp = (self.x_sky - dx) * np.sin(PAr) + (self.y_sky - dy) * np.cos(PAr)
-        yp = (self.x_sky - dx) * np.cos(PAr) - (self.y_sky - dy) * np.sin(PAr)
-        yp /= np.cos(inclr)
-        rp = np.hypot(xp, yp)
-        tp = np.arctan2(yp, xp)
-        zp = np.zeros_like(rp)
+        xf = (self.x_sky - dx) * np.sin(PAr) + (self.y_sky - dy) * np.cos(PAr)
+        yf = (self.x_sky - dx) * np.cos(PAr) - (self.y_sky - dy) * np.sin(PAr)
+        yf /= np.cos(inc)
+        rf = np.hypot(xf, yf)
+        tf = np.arctan2(yf, az_sgn * xf)
+        zf = np.zeros_like(rf)
 
         # generate a 3D grid in the disk frame 
         x_ = np.linspace(-r_span, r_span, N_span)
-        y_ = np.linspace(-1.1 * r_span * np.sin(inclr),
-                         1.1 * r_span * np.sin(inclr), N_span)
+        y_ = np.linspace(-r_span, r_span, N_span)
         x_disk, y_disk = np.meshgrid(x_, y_)
         z_disk = z_func(np.hypot(x_disk, y_disk))
         z_disk = np.where(np.isfinite(z_disk), z_disk, 0.0)
 
         # Incline the disk.
         x_dep = x_disk
-        y_dep = y_disk * np.cos(inclr) - z_disk * np.sin(inclr)
+        y_dep = y_disk * np.cos(inc) - z_disk * np.sin(inc)
 
         # Remove shadowed pixels.
-        if incl < 0.0:
-            y_dep = np.maximum.accumulate(y_dep[::-1], axis=0)[::-1]
-        else:
+        if incl < 0.:
             y_dep = np.minimum.accumulate(y_dep[::-1], axis=0)[::-1]
+        else:
+            y_dep = np.maximum.accumulate(y_dep, axis=0)
 
         # interpolation
         points_2D = np.column_stack((x_dep.flatten(), y_dep.flatten()))
-        xsys = np.column_stack((xp.flatten(), yp.flatten() * np.cos(inclr)))
+        xsys = np.column_stack((xf.flatten(), yf.flatten() * np.cos(inc)))
         vtx, wts = self.interp_weights(points_2D, xsys)
-        xd = np.reshape(self.interpolate_vals(x_disk.flatten(), vtx, wts),
-                        self.x_sky.shape)
-        yd = np.reshape(self.interpolate_vals(y_disk.flatten(), vtx, wts),
-                        self.x_sky.shape)
-        rd = np.hypot(xd, yd)
-        td = np.arctan2(yd, xd)
-        zd = z_func(rd)
-        zd = np.where(np.isfinite(zd), zd, 0.0)
+        x_obs = np.reshape(self.interpolate_vals(x_disk.flatten(), vtx, wts),
+                           self.x_sky.shape)
+        y_obs = np.reshape(self.interpolate_vals(y_disk.flatten(), vtx, wts),
+                           self.x_sky.shape)
+        r_obs = np.hypot(x_obs, y_obs)
+        t_obs = np.arctan2(y_obs, az_sgn * x_obs)
+        z_obs = z_func(r_obs)
 
         # backfill extrapolations to a flat disk
-        r = np.where(np.isfinite(rd), rd, rp)
-        t = np.where(np.isfinite(td), td, tp)
-        z = np.where(np.isfinite(zd), zd, zp)
+        r = np.where(np.isfinite(r_obs), r_obs, rf)
+        t = np.where(np.isfinite(t_obs), t_obs, tf)
+        z = np.where(np.isfinite(z_obs), z_obs, zf)
+
+        return r, t, z
+
+
+    def set_disk_coords(self, dx, dy, incl, PA, dist, z_func=None,
+                        side='both', r_span=5., N_span=64):
 
         if side.lower() == 'both':
             # front surface
+            r, t, z = self.deproj_coords(dx, dy, incl, PA, z_func=z_func, 
+                                         side='front', r_span=r_span, 
+                                         N_span=N_span)
             self.r_disk_f, self.t_disk_f, self.z_disk_f = r * dist, t, z * dist
             self.dx_f, self.dy_f = dx, dy
             self.incl_f, self.PA_f = incl, PA
@@ -106,6 +120,9 @@ class csalt_disk:
             self.x_disk_f = self.r_disk_f * np.cos(self.t_disk_f)
             self.y_disk_f = self.r_disk_f * np.sin(self.t_disk_f)
             # back surface
+            r, t, z = self.deproj_coords(dx, dy, incl, PA, z_func=z_func,
+                                         side='back', r_span=r_span, 
+                                         N_span=N_span)
             self.r_disk_b, self.t_disk_b, self.z_disk_b = r * dist, t, z * dist
             self.dx_b, self.dy_b = dx, dy
             self.incl_b, self.PA_b = incl, PA
@@ -113,6 +130,9 @@ class csalt_disk:
             self.x_disk_b = self.r_disk_b * np.cos(self.t_disk_b)
             self.y_disk_b = self.r_disk_b * np.sin(self.t_disk_b)
         elif side.lower() == 'front':
+            r, t, z = self.deproj_coords(dx, dy, incl, PA, z_func=z_func,
+                                         side='front', r_span=r_span, 
+                                         N_span=N_span)
             self.r_disk_f, self.t_disk_f, self.z_disk_f = r * dist, t, z * dist
             self.dx_f, self.dy_f = dx, dy
             self.incl_f, self.PA_f = incl, PA
@@ -120,6 +140,9 @@ class csalt_disk:
             self.x_disk_f = self.r_disk_f * np.cos(self.t_disk_f)
             self.y_disk_f = self.r_disk_f * np.sin(self.t_disk_f)
         elif side.lower() == 'back':
+            r, t, z = self.deproj_coords(dx, dy, incl, PA, z_func=z_func,
+                                         side='back', r_span=r_span, 
+                                         N_span=N_span)
             self.r_disk_b, self.t_disk_b, self.z_disk_b = r * dist, t, z * dist
             self.dx_b, self.dy_b = dx, dy
             self.incl_b, self.PA_b = incl, PA
@@ -132,19 +155,18 @@ class csalt_disk:
 
     # -- The gas temperature distribution along the emitting surfaces
     def set_Tgas_profile(self, function, side='both', vmin=0.0, vmax=None):
-        if side.lower() == 'both':
-            self.Tgas_f = np.clip(function(self.r_disk_f), 
-                                  a_min=vmin, a_max=vmax)
-            self.Tgas_b = np.clip(function(self.r_disk_b), 
-                                  a_min=vmin, a_max=vmax)
-        elif side.lower() == 'front':
+        if side.lower() == 'front':
             self.Tgas_f = np.clip(function(self.r_disk_f), 
                                   a_min=vmin, a_max=vmax)
         elif side.lower() == 'back':
             self.Tgas_b = np.clip(function(self.r_disk_b), 
                                   a_min=vmin, a_max=vmax)
         else:
-            raise ValueError("`side` must be 'front', 'back' or 'both'.")
+            raise ValueError("`side` must be 'front' or 'back'.")
+
+
+    def Tgas_function(self, function, radius, vmin=0, vmax=None):
+        return np.clip(function(radius), a_min=vmin, a_max=vmax)
 
 
     # -- The line profile width distribution along the emitting surfaces
